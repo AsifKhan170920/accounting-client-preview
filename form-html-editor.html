@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form HTML Editor</title>
+<link rel="stylesheet" href="css/form-editor.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><div class="mark">F</div><div><h1>Form HTML Editor</h1><small>Build &amp; export form layouts</small></div></div>
+    <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)">Document
+      <select id="docSelect" onchange="App.switchDoc(this.value)" style="border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:13px;font-family:inherit;background:#fff;font-weight:600;color:var(--ink)"></select>
+    </label>
+    <div class="tabs">
+      <button id="tabElements" class="on" onclick="App.setTab('elements')">Form Elements</button>
+      <button id="tabSettings" onclick="App.setTab('settings')">Form Settings</button>
+    </div>
+    <div class="spacer"></div>
+    <button class="tbtn" onclick="App.resetDefault()">↺ Reset to default</button>
+    <button class="tbtn primary" onclick="App.updateExit()">Update</button>
+  </div>
+
+  <div class="shell">
+    <div class="main-col">
+      <aside class="props">
+        <div class="props-head" id="propsHead">⚙ Properties</div>
+        <div class="props-body" id="props"></div>
+      </aside>
+
+      <main class="canvas-wrap">
+        <div class="canvas-bar">
+          <span class="ttl" id="canvasTitle">Form canvas</span>
+          <div class="seg"><button id="vbPreview" class="on" onclick="App.setView('preview')">Preview</button><button id="vbCode" onclick="App.setView('code')">HTML</button></div>
+        </div>
+        <div id="stage"></div>
+      </main>
+    </div>
+
+    <aside class="rail">
+      <div class="rail-head"><div class="t" id="railTitle">Form Elements</div><div class="s" id="railSub">Click an item to add it to the form</div></div>
+      <div class="rail-scroll" id="rail"></div>
+    </aside>
+  </div>
+
+<script src="js/form-editor.js"></script>
+</body>
+</html>

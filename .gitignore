@@ -1,0 +1,15 @@
+# Dependencies
+invoice-designer/node_modules/
+
+# Build artifacts
+invoice-designer/tsconfig.tsbuildinfo
+
+# OS / editor
+.DS_Store
+.claude/
+.vscode/
+*.log
+
+# Local env / secrets
+.env
+.env.*

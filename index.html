@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manager — Accounting</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/form-editor-embedded.css">
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth">
+  <div class="auth-card">
+    <div class="brand"><div class="logo">M</div><h1>Manager</h1><p>Accounting for your businesses</p></div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" data-mode="signin" onclick="App.setAuthMode('signin')">Sign in</div>
+      <div class="auth-tab" data-mode="signup" onclick="App.setAuthMode('signup')">Sign up</div>
+    </div>
+    <div id="signupName" class="hide"><label class="fld">Full name</label><input id="suName" type="text" placeholder="Jane Smith"></div>
+    <label class="fld">Username</label><input id="auUser" type="text" placeholder="Administrator">
+    <label class="fld">Password</label>
+    <input id="auPass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')App.submitAuth()">
+    <div id="authErr" class="auth-err hide"></div>
+    <button class="btn btn-primary" onclick="App.submitAuth()" id="authBtn">Sign in</button>
+    <div class="auth-foot" id="authFoot">No account yet? <a onclick="App.setAuthMode('signup')">Create one</a></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hide">
+  <div class="toolbar">
+    <span class="tb-corner left"><span class="tb-ico">🅰</span></span>
+    <button class="tb-btn" id="tabBiz" onclick="App.go('businesses')"><span class="tb-ico">🏢</span>Businesses</button>
+    <button class="tb-btn" id="tabUsers" onclick="App.go('users')"><span class="tb-ico">👥</span>Users</button>
+    <button class="tb-btn" onclick="App.stub('Support')"><span class="tb-ico">🛟</span>Support</button>
+    <span class="tb-static"><span class="tb-ico">👤</span><span id="userName">Administrator</span></span>
+    <button class="tb-btn" onclick="App.logout()"><span class="tb-ico">⎋</span>Logout</button>
+    <span class="tb-corner right" title="Toggle light / dark theme" style="cursor:pointer" onclick="App.toggleTheme()">◐</span>
+  </div>
+
+  <div id="pageBusinesses" class="page">
+    <div class="page-head"><h1 class="page-title">Businesses</h1></div>
+    <div class="actions">
+      <div class="dd" id="addDd">
+        <button class="btn btn-primary" onclick="App.toggleAdd(event)">Add Business <i class="caret"></i></button>
+        <div class="dd-menu hide" id="addMenu">
+          <button onclick="App.showCreate()">Create New Business</button>
+          <button onclick="App.importBusiness()">Import Business</button>
+        </div>
+      </div>
+      <button class="btn btn-danger" id="removeBtn" onclick="App.removeSelected()" disabled>Remove</button>
+      <div class="search"><span class="ic">🔍</span><input id="bizSearch" type="text" placeholder="Search businesses…" oninput="App.renderBusinesses()"></div>
+    </div>
+    <div id="bizListWrap"></div>
+    <div class="count" id="bizCount"></div>
+  </div>
+
+  <div id="pageCreate" class="page hide">
+    <div class="card">
+      <h2>Create New Business</h2>
+      <p class="sub">Choose a country to pre-set currency, date format and chart of accounts.</p>
+      <label class="fld">Business Name</label>
+      <input id="newBizName" type="text" placeholder="Unnamed" onkeydown="if(event.key==='Enter')App.createBusiness()">
+      <label class="fld">Country</label>
+      <select id="newBizCountry"><option value="">Automatic</option>
+        <option>United Arab Emirates</option><option>United States</option><option>United Kingdom</option>
+        <option>Australia</option><option>Canada</option><option>India</option><option>Pakistan</option>
+        <option>Saudi Arabia</option><option>Singapore</option><option>New Zealand</option></select>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="App.createBusiness()">Add Business</button>
+        <button class="btn" onclick="App.go('businesses')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pageUsers" class="page hide">
+    <div class="page-head"><h1 class="page-title">Users</h1></div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="App.showNewUser()">New User</button>
+      <div class="search"><span class="ic">🔍</span><input id="userSearch" type="text" placeholder="Search users…" oninput="App.renderUsers()"></div>
+    </div>
+    <div id="userListWrap"></div>
+    <div class="count" id="userCount"></div>
+  </div>
+
+  <div id="pageNewUser" class="page hide">
+    <div class="card">
+      <h2>New User</h2>
+      <p class="sub">Administrators can access every business. Restricted users get limited access.</p>
+      <label class="fld">Name</label><input id="nuName" type="text" placeholder="Full name">
+      <label class="fld">Username</label><input id="nuUser" type="text" placeholder="Login username">
+      <label class="fld">Password</label><input id="nuPass" type="password" placeholder="••••••••">
+      <label class="fld">Role</label>
+      <select id="nuRole"><option value="Administrator">Administrator</option><option value="Restricted user">Restricted user</option></select>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="App.createUser()">Create</button>
+        <button class="btn" onclick="App.go('users')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pageWorkspace" class="hide" style="flex:1;display:flex;flex-direction:column">
+    <div class="ws-head">
+      <div class="ws-head-left">
+        <span class="ws-close" title="Close business" onclick="App.closeBusiness()">✕</span>
+        <span class="ws-biz-name" id="wsBizName"></span>
+        <a onclick="App.renameBusiness()">Rename</a>
+      </div>
+      <div class="ws-head-right">
+        <button class="btn btn-sm" onclick="App.openTool('emails')">Emails</button>
+        <button class="btn btn-sm" onclick="App.openTool('history')">History</button>
+        <button class="btn btn-sm" onclick="App.openTool('backup')">Backup</button>
+      </div>
+    </div>
+    <div class="ws-body">
+      <aside class="sidebar" id="sidebar"></aside>
+      <main class="ws-main" id="wsMain"></main>
+    </div>
+  </div>
+
+  <div class="foot" id="appFoot">Manager · Steps 1–3 · data is stored locally in this browser</div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/accounting.js"></script>
+<script src="js/app.js"></script>
+<script src="js/designer.js"></script>
+<script src="js/form-editor-bridge.js"></script>
+<template id="fedTpl"><div id="fedHost" class="embedded">
+  <div class="topbar">
+    <div class="brand"><div class="mark">F</div><div><h1>Form HTML Editor</h1><small>Build &amp; export form layouts</small></div></div>
+    <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)">Document
+      <select id="docSelect" onchange="FED.switchDoc(this.value)" style="border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:13px;font-family:inherit;background:#fff;font-weight:600;color:var(--ink)"></select>
+    </label>
+    <div class="tabs">
+      <button id="tabElements" class="on" onclick="FED.setTab('elements')">Form Elements</button>
+      <button id="tabSettings" onclick="FED.setTab('settings')">Form Settings</button>
+    </div>
+    <div class="spacer"></div>
+    <button class="tbtn" onclick="FED.resetDefault()">↺ Reset to default</button>
+    <button class="tbtn primary" onclick="FED.updateExit()">Update</button>
+  </div>
+
+  <div class="shell">
+    <div class="main-col">
+      <aside class="props">
+        <div class="props-head" id="propsHead">⚙ Properties</div>
+        <div class="props-body" id="props"></div>
+      </aside>
+
+      <main class="canvas-wrap">
+        <div class="canvas-bar">
+          <span class="ttl" id="canvasTitle">Form canvas</span>
+          <div class="seg"><button id="fed_vbPreview" class="on" onclick="FED.setView('preview')">Preview</button><button id="fed_vbCode" onclick="FED.setView('code')">HTML</button></div>
+        </div>
+        <div id="stage"></div>
+      </main>
+    </div>
+
+    <aside class="rail">
+      <div class="rail-head"><div class="t" id="railTitle">Form Elements</div><div class="s" id="railSub">Click an item to add it to the form</div></div>
+      <div class="rail-scroll" id="rail"></div>
+    </aside>
+  </div>
+
+</div></template>
+<script src="js/form-editor-embedded.js"></script>
+<link rel="stylesheet" href="dist/invoice-designer/invoice-designer.css">
+<script src="dist/invoice-designer/invoice-designer.js"></script>
+<script src="js/invoice-designer-bridge.js"></script>
+</body>
+</html>
