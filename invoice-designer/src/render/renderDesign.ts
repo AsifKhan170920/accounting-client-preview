@@ -77,7 +77,10 @@ function renderElement(el: DesignElement, data: InvoiceData): string {
   }
 
   if (el.type === 'circle') {
-    return `<div style="${elementStyle(el)};width:${el.width}px;height:${el.height}px;border-radius:50%;background:${el.fill ?? '#e8f4fd'};border:${el.strokeWidth ?? 1}px solid ${el.stroke ?? '#2389d6'}"></div>`;
+    // the Fabric canvas draws a circle of radius min(w,h)/2; match it here so
+    // what the designer shows is what prints, rather than an ellipse
+    const d = Math.min(el.width, el.height);
+    return `<div style="${elementStyle(el)};width:${d}px;height:${d}px;border-radius:50%;background:${el.fill ?? '#e8f4fd'};border:${el.strokeWidth ?? 1}px solid ${el.stroke ?? '#2389d6'}"></div>`;
   }
 
   if (el.type === 'image' || (el.type === 'placeholder' && el.placeholder === 'company_logo')) {
@@ -95,7 +98,9 @@ function renderElement(el: DesignElement, data: InvoiceData): string {
     text = resolvePlaceholder(el.placeholder, data);
   }
 
-  const whiteSpace = 'white-space:pre-wrap';
+  // break-word keeps a long unbroken token inside its own box instead of
+  // bleeding sideways across neighbouring elements.
+  const whiteSpace = 'white-space:pre-wrap;overflow-wrap:break-word';
   return `<div style="${elementStyle(el)};${whiteSpace}">${esc(text).replace(/\n/g, '<br>')}</div>`;
 }
 
