@@ -35,7 +35,7 @@
     <span class="tb-corner left"><span class="tb-ico">🅰</span></span>
     <button class="tb-btn" id="tabBiz" onclick="App.go('businesses')"><span class="tb-ico">🏢</span>Businesses</button>
     <button class="tb-btn" id="tabUsers" onclick="App.go('users')"><span class="tb-ico">👥</span>Users</button>
-    <button class="tb-btn" onclick="App.stub('Support')"><span class="tb-ico">🛟</span>Support</button>
+    <button class="tb-btn" id="tabSupport" onclick="App.go('support')"><span class="tb-ico">🛟</span>Support</button>
     <span class="tb-static"><span class="tb-ico">👤</span><span id="userName">Administrator</span></span>
     <button class="tb-btn" onclick="App.logout()"><span class="tb-ico">⎋</span>Logout</button>
     <span class="tb-corner right" title="Toggle light / dark theme" style="cursor:pointer" onclick="App.toggleTheme()">◐</span>
@@ -100,6 +100,11 @@
         <button class="btn" onclick="App.go('users')">Cancel</button>
       </div>
     </div>
+  </div>
+
+  <div id="pageSupport" class="page hide">
+    <div class="page-head"><h1 class="page-title">Support</h1></div>
+    <div id="supportBody"></div>
   </div>
 
   <div id="pageWorkspace" class="hide" style="flex:1;display:flex;flex-direction:column">

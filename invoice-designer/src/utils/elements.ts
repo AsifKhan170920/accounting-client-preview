@@ -17,7 +17,9 @@ export function createElement(type: DesignElement['type'], opts?: Partial<Design
     name: type,
     x: 80,
     y: 80,
-    width: type === 'line' ? 200 : 180,
+    // a circle starts square so the canvas (which draws radius min(w,h)/2) and
+    // the printed page agree on its size
+    width: type === 'line' ? 200 : type === 'circle' ? 80 : 180,
     height: type === 'line' ? 2 : type === 'circle' ? 80 : 40,
     angle: 0,
     opacity: 1,
@@ -60,11 +62,13 @@ export function createElement(type: DesignElement['type'], opts?: Partial<Design
     base.placeholder = 'items_table';
     base.width = 500;
     base.height = 200;
+    // widths are percentages and must total 100, or the table renders narrower
+    // than its element box
     base.columns = [
-      { id: uid('col'), key: 'item', label: 'Description', width: 40, align: 'left' },
+      { id: uid('col'), key: 'item', label: 'Description', width: 46, align: 'left' },
       { id: uid('col'), key: 'qty', label: 'Qty', width: 12, align: 'right' },
-      { id: uid('col'), key: 'price', label: 'Price', width: 18, align: 'right' },
-      { id: uid('col'), key: 'amount', label: 'Amount', width: 18, align: 'right' },
+      { id: uid('col'), key: 'price', label: 'Price', width: 21, align: 'right' },
+      { id: uid('col'), key: 'amount', label: 'Amount', width: 21, align: 'right' },
     ];
     base.showHeader = true;
     base.headerBg = '#2389d6';

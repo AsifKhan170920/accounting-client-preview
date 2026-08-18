@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --import ./test/_loader.mjs --test test/*.test.ts"
   },
   "dependencies": {
     "fabric": "^6.6.1",

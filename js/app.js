@@ -76,23 +76,150 @@ const App = {
   /* ---------- top-level nav ---------- */
   go(view){
     this.view=view;
-    ['Businesses','Create','Users','NewUser','Workspace'].forEach(p=>document.getElementById('page'+p).classList.add('hide'));
+    ['Businesses','Create','Users','NewUser','Support','Workspace'].forEach(p=>document.getElementById('page'+p).classList.add('hide'));
     document.getElementById('tabBiz').classList.toggle('active', view==='businesses'||view==='create'||view==='workspace');
     document.getElementById('tabUsers').classList.toggle('active', view==='users'||view==='newUser');
+    document.getElementById('tabSupport').classList.toggle('active', view==='support');
     document.getElementById('appFoot').classList.toggle('hide', view==='workspace');
     if(view==='businesses'){ document.getElementById('pageBusinesses').classList.remove('hide'); this.renderBusinesses(); }
     else if(view==='create'){ document.getElementById('pageCreate').classList.remove('hide'); document.getElementById('newBizName').value=''; document.getElementById('newBizName').focus(); }
     else if(view==='users'){ document.getElementById('pageUsers').classList.remove('hide'); this.renderUsers(); }
     else if(view==='newUser'){ document.getElementById('pageNewUser').classList.remove('hide'); }
+    else if(view==='support'){ document.getElementById('pageSupport').classList.remove('hide'); this.renderSupport(); }
     else if(view==='workspace'){ document.getElementById('pageWorkspace').classList.remove('hide'); this.renderWorkspace(); }
     document.getElementById('addMenu').classList.add('hide');
   },
-  stub(n){ alert(n+'\n\nThis will be built in a later step.'); },
+
+  /* ---------- support ---------- */
+  _kb(n){ if(!isFinite(n)) return '—'; if(n<1024) return n+' B';
+    if(n<1024*1024) return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(2)+' MB'; },
+  /* Bytes localStorage is holding. Strings are UTF-16 in the browser's quota
+     accounting, hence the ×2 — an estimate, not an exact figure.
+     `mine` counts only this app's keys; other apps can share the same origin. */
+  APP_KEY_RE:/^mgr_/,
+  storageBytes(){ let total=0, mine=0; const per={};
+    try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i);
+      const v=localStorage.getItem(k)||''; const n=(k.length+v.length)*2;
+      per[k]=n; total+=n; if(this.APP_KEY_RE.test(k)) mine+=n; } }catch(e){}
+    return {total,mine,per}; },
+  supportDiag(){
+    const biz=DB.get(DB.k.biz,[])||[]; const users=DB.get(DB.k.users,[])||[];
+    const st=this.storageBytes();
+    const recCount=biz.reduce((a,b)=>a+Object.keys(b.records||{}).reduce((x,k)=>x+((b.records[k]||[]).length),0),0);
+    let designs=0; try{ const d=JSON.parse(localStorage.getItem('mgr_invoice_designs')||'{}');
+      Object.keys(d).forEach(bid=>{ designs+=Object.keys(d[bid]||{}).length; }); }catch(e){}
+    const M=window.InvoiceDesignerModule;
+    return {
+      businesses:biz.length, users:users.length, records:recCount, designs:designs,
+      storage:st.mine, storageOrigin:st.total, storagePer:st.per,
+      designerLoaded:!!(M&&(M.mountInvoiceDesigner||(M.InvoiceDesignerAPI&&M.InvoiceDesignerAPI.mount))),
+      protocol:location.protocol, origin:location.origin||'—',
+      ua:navigator.userAgent,
+      localStorageOk:(function(){ try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); return true; }catch(e){ return false; } })(),
+    }; },
+  renderSupport(){ const el=document.getElementById('supportBody'); if(el) el.innerHTML=this.supportHtml(); },
+  supportHtml(){
+    const d=this.supportDiag(); const self=this;
+    const ok=v=>v?'<span class="sup-ok">✓ yes</span>':'<span class="sup-bad">✗ no</span>';
+    /* labels here are author-controlled markup, values are pre-escaped by callers */
+    const row=(k,v)=>'<tr><th>'+k+'</th><td>'+v+'</td></tr>';
+    const faq=(q,a)=>'<details class="sup-faq"><summary>'+self.esc(q)+'</summary><div>'+a+'</div></details>';
+    const h3=(ico,txt)=>'<h3><span class="sup-ico">'+ico+'</span>'+txt+'</h3>';
+
+    const top=this.storageBytes();
+    const perRows=Object.keys(top.per).filter(k=>self.APP_KEY_RE.test(k))
+      .sort((a,b)=>top.per[b]-top.per[a]).slice(0,6)
+      .map(k=>'<tr><th><code>'+self.esc(k)+'</code></th><td>'+self._kb(top.per[k])+'</td></tr>').join('');
+    const otherBytes=top.total-top.mine;
+
+    return ''+
+    '<div class="sup-grid">'+
+
+      '<div class="sup-card">'+
+        h3('🚀','Getting started')+
+        '<ol class="sup-steps">'+
+          '<li><b>Create a business</b> — Businesses tab → <i>Add Business</i> → Create New Business.</li>'+
+          '<li><b>Set it up</b> — open the business, then Settings → Business Details, Chart of Accounts, Tax Codes and Currencies.</li>'+
+          '<li><b>Enter transactions</b> — pick a section in the sidebar (Receipts, Sales Invoices, …) and click the blue <i>New …</i> button.</li>'+
+          '<li><b>Design your documents</b> — Settings → Custom Theme → Form Formatting → pick a document to open the drag-and-drop Invoice Designer.</li>'+
+          '<li><b>Report &amp; print</b> — Reports in the sidebar, or the Print / Save as PDF buttons on any document.</li>'+
+        '</ol>'+
+        '<p class="sub">Only the sections you use need to stay visible — hide the rest with <b>Customize</b> at the bottom of the sidebar.</p>'+
+      '</div>'+
+
+      '<div class="sup-card">'+
+        h3('💾','Where your data lives')+
+        '<p class="sub">This app has no server. Everything is stored in this browser\'s <b>localStorage</b>, on this device, under this origin only.</p>'+
+        '<table class="sup-tbl">'+
+          row('Businesses &amp; records','<code>mgr_businesses</code>')+
+          row('User accounts','<code>mgr_users</code>')+
+          row('Signed-in session','<code>mgr_session</code>')+
+          row('Invoice designs','<code>mgr_invoice_designs</code>')+
+        '</table>'+
+        '<div class="sup-warn">Clearing site data, using private / incognito mode, or switching browser or device will lose everything that has not been backed up. '+
+        'Take a backup from the <b>Backup</b> button in the business header.</div>'+
+      '</div>'+
+
+      '<div class="sup-card">'+
+        h3('🩺','Diagnostics')+
+        '<table class="sup-tbl sup-diag">'+
+          row('Businesses', d.businesses)+
+          row('User accounts', d.users)+
+          row('Records stored', d.records.toLocaleString('en-US'))+
+          row('Saved invoice designs', d.designs)+
+          row('Storage used by this app', this._kb(d.storage))+
+          (otherBytes>0?row('Other apps on this origin', this._kb(otherBytes)):'')+
+          row('localStorage writable', ok(d.localStorageOk))+
+          row('Invoice Designer module', ok(d.designerLoaded))+
+          row('Served over', '<code>'+self.esc(d.protocol)+'</code> '+(d.protocol==='file:'?'<span class="sup-bad">— serve over http instead</span>':'<span class="sup-ok">✓</span>'))+
+          row('Origin', '<code>'+self.esc(d.origin)+'</code>')+
+        '</table>'+
+        (perRows?'<h4 class="sup-h4">This app\'s largest keys</h4><table class="sup-tbl">'+perRows+'</table>':'')+
+        '<div class="form-actions">'+
+          '<button class="btn btn-xs" onclick="App.renderSupport()">Refresh</button> '+
+          '<button class="btn btn-xs" onclick="App.copyDiagnostics()">Copy diagnostics</button>'+
+        '</div>'+
+      '</div>'+
+
+      '<div class="sup-card">'+
+        h3('❓','Troubleshooting')+
+        faq('The page is blank or the styling is missing',
+          'The app loads <code>css/</code> and <code>js/</code> as separate files, so it must be served over HTTP — opening <code>index.html</code> directly via <code>file://</code> is blocked by most browsers. Run <code>python3 -m http.server 8080</code> in the project folder and open <code>http://localhost:8080/</code>.')+
+        faq('"Invoice Designer module not loaded"',
+          'The React / Fabric.js bundle in <code>dist/invoice-designer/</code> is missing or stale. Rebuild it with <code>cd invoice-designer &amp;&amp; npm install &amp;&amp; npm run build</code>, then hard-refresh the page.')+
+        faq('My design changes do not show on the printed document',
+          'Click <b>Save design</b> in the designer before closing it. Designs are stored per business and per document type, so a design saved for Sales Invoice does not apply to Purchase Invoice.')+
+        faq('I cannot edit or delete a transaction',
+          'Check Settings → <b>Lock Date</b>. Entries dated on or before the lock date are read-only. Clear or move the lock date to edit them.')+
+        faq('My numbers look wrong on the Summary',
+          'The Summary covers a fixed period. Click <b>Edit</b> above the balance sheet to change the date range. Balances are computed from the transactions themselves, not stored, so they always reflect current data.')+
+        faq('How do I move my data to another computer?',
+          'Open the business, click <b>Backup</b> in the header to download a JSON file, then on the other machine use Businesses → <i>Add Business</i> → <b>Import Business</b> and select that file.')+
+        faq('How do I email an invoice or report?',
+          'Open the document and click <b>Email</b> (reports have the same button). Pick a delivery method first in Settings → Email Settings: '+
+          '<b>Mail client</b> opens your own mail app with the message filled in — save the PDF and attach it yourself, because a web page cannot attach files to a <code>mailto:</code> link. '+
+          '<b>HTTP relay</b> POSTs the message to an endpoint you run, which does the SMTP delivery. Every send is recorded under <b>Emails</b>.')+
+      '</div>'+
+
+    '</div>'; },
+  copyDiagnostics(){ const d=this.supportDiag();
+    const txt=['Accounting Client — diagnostics',
+      'businesses: '+d.businesses, 'users: '+d.users, 'records: '+d.records,
+      'invoice designs: '+d.designs, 'storage: '+this._kb(d.storage),
+      'localStorage writable: '+d.localStorageOk, 'designer module loaded: '+d.designerLoaded,
+      'protocol: '+d.protocol, 'origin: '+d.origin, 'userAgent: '+d.ua].join('\n');
+    const done=()=>{ try{ this.toast?this.toast('Diagnostics copied'):alert('Diagnostics copied to clipboard.'); }catch(e){ alert('Diagnostics copied to clipboard.'); } };
+    try{ navigator.clipboard.writeText(txt).then(done,()=>this._copyFallback(txt,done)); }
+    catch(e){ this._copyFallback(txt,done); } },
+  _copyFallback(txt,done){ try{ const ta=document.createElement('textarea'); ta.value=txt;
+    ta.style.position='fixed'; ta.style.left='-9999px'; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta); done(); }catch(e){ alert(txt); } },
 
   /* ---------- businesses ---------- */
   toggleAdd(e){ e.stopPropagation(); document.getElementById('addMenu').classList.toggle('hide'); },
   showCreate(){ this.go('create'); },
-  importBusiness(){ document.getElementById('addMenu').classList.add('hide'); alert('Import Business\n\nFile import will be added in a later step.'); },
+  /* Same JSON format the Backup button writes, so a backup round-trips. */
+  importBusiness(){ document.getElementById('addMenu').classList.add('hide'); this.backupImport(); },
   createBusiness(){
     const name=document.getElementById('newBizName').value.trim()||'Unnamed';
     const country=document.getElementById('newBizCountry').value||'Automatic';
@@ -139,10 +266,16 @@ const App = {
     document.getElementById('wsBizName').textContent=b.name;
     this.renderSidebar(b); this.renderMain(b);
   },
+  /* ---------- sidebar + Customize ---------- */
+  /* Hidden sections are stored per business as an array of SIDEBAR labels.
+     'Summary' is never hideable — it is the workspace home. */
+  hiddenSections(b){ return (b&&b.sidebarHidden)||[]; },
+  isHidden(b,label){ return label!=='Summary' && this.hiddenSections(b).indexOf(label)>=0; },
   renderSidebar(b){
     const rec=b.records||{};
     let html='';
     SIDEBAR.forEach(([ico,label,key])=>{
+      if(this.isHidden(b,label)) return;
       const active=this.wsSection===label?' active':'';
       let badge='';
       if(key){ const n=(rec[key]||[]).length; badge='<span class="side-badge'+(n===0?' zero':'')+'">'+n.toLocaleString('en-US')+'</span>'; }
@@ -155,15 +288,65 @@ const App = {
       html+='<div class="side-item'+active+'" onclick="App.selectSection(\''+label+'\')">'+
         '<span class="side-ico">'+ico+'</span><span class="side-label side-plain">'+label+'</span></div>';
     });
-    html+='<div class="side-customize" onclick="App.stub(\'Customize\')">Customize</div>';
+    const nHid=this.hiddenSections(b).length;
+    html+='<div class="side-customize'+(this.wsMode==='customize'?' on':'')+'" onclick="App.openCustomize()">Customize'+
+      (nHid?'<span class="side-cust-n">'+nHid+' hidden</span>':'')+'</div>';
     document.getElementById('sidebar').innerHTML=html;
   },
+  openCustomize(){ this.wsMode='customize'; this.wsSection=null; this.navTrail=[]; this.editingId=null;
+    this._custDraft=this.hiddenSections(this.curBiz()).slice(); this.renderWorkspace(); },
+  customizeHtml(b){
+    const rec=b.records||{}; const draft=this._custDraft||[];
+    const rows=SIDEBAR.map(([ico,label,key])=>{
+      const fixed=label==='Summary';
+      const on=fixed||draft.indexOf(label)<0;
+      const n=key?(rec[key]||[]).length:0;
+      const cnt=key?('<span class="cust-count'+(n===0?' zero':'')+'">'+n.toLocaleString('en-US')+'</span>'):'<span class="cust-count zero">—</span>';
+      return '<label class="cust-row'+(fixed?' fixed':'')+'">'+
+        '<input type="checkbox" '+(on?'checked':'')+(fixed?' disabled':'')+
+          ' onchange="App.custToggle(\''+label.replace(/'/g,"\\'")+'\',this.checked)">'+
+        '<span class="cust-ico">'+ico+'</span>'+
+        '<span class="cust-name">'+this.esc(label)+(fixed?' <span class="cust-fixed">always shown</span>':'')+'</span>'+
+        cnt+'</label>';
+    }).join('');
+    const nHid=draft.filter(l=>l!=='Summary').length;
+    return this.crumb('Customize')+
+      '<div class="info-bar">Choose which sections appear in the sidebar for <b>'+this.esc(b.name||'this business')+'</b>. '+
+        'Hiding a section only removes it from the sidebar — its records and totals are untouched, and it still appears in reports.</div>'+
+      '<div class="card cust-card"><h2>Sidebar sections</h2>'+
+      '<div class="cust-actions">'+
+        '<button class="btn btn-xs" onclick="App.custAll(true)">Show all</button> '+
+        '<button class="btn btn-xs" onclick="App.custAll(false)">Hide all</button> '+
+        '<button class="btn btn-xs" onclick="App.custHideEmpty()">Hide empty sections</button>'+
+        '<span class="cust-summary">'+(nHid?nHid+' hidden':'nothing hidden')+'</span>'+
+      '</div>'+
+      '<div class="cust-list">'+rows+'</div>'+
+      '<div class="form-actions">'+
+        '<button class="btn btn-primary" onclick="App.saveCustomize()">Update</button>'+
+        '<button class="btn" onclick="App.customizeCancel()">Cancel</button>'+
+      '</div></div>'; },
+  custToggle(label,on){ var d=this._custDraft||[]; var i=d.indexOf(label);
+    if(on){ if(i>=0) d.splice(i,1); } else if(i<0 && label!=='Summary'){ d.push(label); }
+    this._custDraft=d; this.renderMain(this.curBiz()); },
+  custAll(on){ this._custDraft = on ? [] : SIDEBAR.map(s=>s[1]).filter(l=>l!=='Summary');
+    this.renderMain(this.curBiz()); },
+  custHideEmpty(){ const b=this.curBiz(); const rec=b.records||{};
+    this._custDraft=SIDEBAR.filter(([i,label,key])=>label!=='Summary'&&key&&(rec[key]||[]).length===0).map(s=>s[1]);
+    this.renderMain(b); },
+  saveCustomize(){ const b=this.curBiz(); b.sidebarHidden=(this._custDraft||[]).filter(l=>l!=='Summary');
+    this.saveBiz(b); this._custDraft=null;
+    try{ this.toast && this.toast('Sidebar updated'); }catch(e){}
+    this.wsMode='summary'; this.wsSection='Summary'; this.renderWorkspace(); },
+  customizeCancel(){ this._custDraft=null; this.wsMode='summary'; this.wsSection='Summary'; this.renderWorkspace(); },
   renderMain(b){
     const m=document.getElementById('wsMain');
     if(this.wsMode==='summary'){ m.innerHTML=this.summaryHtml(b); return; }
     if(this.wsMode==='summaryEdit'){ m.innerHTML=this.periodFormHtml(b); return; }
+    /* Safety net: every SIDEBAR entry maps to a register, so this only renders
+       if a section is added without one. */
     if(this.wsMode==='section'){ m.innerHTML=this.crumb(this.wsSection)+
-      '<div class="empty" style="margin-top:30px"><div class="big">'+this.esc(this.wsSection)+'</div>This module will be built in a later step.</div>'; return; }
+      '<div class="empty" style="margin-top:30px"><div class="big">'+this.esc(this.wsSection)+'</div>'+
+      'This section has no register configured. Add an entry for it to <code>REG</code> in <code>js/data.js</code>.</div>'; return; }
     if(this.wsMode==='list'){ m.innerHTML=this.listHtml(b); return; }
     if(this.wsMode==='form'){ const _k=LABEL2KEY[this.wsSection]; m.innerHTML=this.formHtml(b); var _self=this; setTimeout(function(){ _self._mountDesignedForm(_k); },0); return; }
     if(this.wsMode==='view'){ m.innerHTML=this.viewHtml(b); return; }
@@ -172,6 +355,7 @@ const App = {
     if(this.wsMode==='statement'){ m.innerHTML=this.statementHtml(b); return; }
     if(this.wsMode==='settings'){ m.innerHTML=this.settingsHtml(b); return; }
     if(this.wsMode==='reports'){ m.innerHTML=this.reportsHtml(b); return; }
+    if(this.wsMode==='customize'){ m.innerHTML=this.customizeHtml(b); return; }
     if(this.wsMode==='tools'){ m.innerHTML=this.toolsHtml(b); return; }
   },
   crumb(title,extra){ var t=this.esc(title); if(title==='Settings') t='<a class="led-link" onclick="App.settingsBack()">Settings</a>';
@@ -1007,6 +1191,7 @@ const App = {
         '<button class="btn btn-sm" onclick="App.copyToMenu()">▸ Copy to</button>'+
         '<button class="btn btn-sm" onclick="App.printView()">Print</button>'+
         '<button class="btn btn-sm" onclick="App.pdfView()">PDF</button>'+
+        '<button class="btn btn-sm" onclick="App.emailDoc()">Email</button>'+
         pager+'</div>'+
       inner+
       '<div class="doc-foot"><span style="display:flex;gap:8px"><button class="ftbtn" onclick="App.txnJournal()">Transaction Journal</button></span></div>'+
@@ -1433,7 +1618,6 @@ const App = {
   addComparative(key,id){ var b=this.curBiz(); var inst=this._applyEditForm(b,key,id); if(!inst) return; inst.comparatives=inst.comparatives||[]; inst.comparatives.push({from:inst.from,to:inst.to,colName:'Comparative'}); this.saveBiz(b); this.renderMain(b); },
   delComparative(key,id,idx){ var b=this.curBiz(); var inst=this._applyEditForm(b,key,id); if(!inst) return; inst.comparatives=(inst.comparatives||[]).filter(function(c,i){ return i!==idx; }); this.saveBiz(b); this.renderMain(b); },
   reportPrint(){ var el=document.getElementById('repDoc'); if(!el){ try{ window.print(); }catch(e){} return; } var pr=document.getElementById('printRegion'); if(!pr){ pr=document.createElement('div'); pr.id='printRegion'; document.body.appendChild(pr); } pr.innerHTML='<div class="card rep-print">'+el.innerHTML+'</div>'; var clean=function(){ try{ pr.innerHTML=''; }catch(e){} window.removeEventListener('afterprint',clean); }; window.addEventListener('afterprint',clean); setTimeout(function(){ try{ window.print(); }catch(e){} setTimeout(clean,1500); },80); },
-  reportEmail(){ alert('To email this report: open Print, then choose “Save as PDF” and attach it from Settings \u2192 Emails. In\u2011app sending isn\u2019t configured.'); },
   reportListHtml(b, key){ var self=this; var reg=this._REPDEF[key]||{}; var list=this._ensureReports(b,key);
     var rows=list.map(function(inst){ return '<tr>'+
       '<td class="act"><button class="btn btn-xs" onclick="App.reportEdit(\''+key+'\',\''+inst.id+'\')">Edit</button></td>'+
@@ -2045,7 +2229,7 @@ const App = {
   ]; },
   settingsHtml(b){
     if(this.setView){ const fn='set_'+this.setView; if(typeof this[fn]==='function') return this[fn](b);
-      return this.setStub((this.setTiles().find(t=>t[2]===this.setView)||[])[1]||'Setting'); }
+      return this.setMissing((this.setTiles().find(t=>t[2]===this.setView)||[])[1]||'Setting'); }
     const tileHtml=t=>{ if(t[4]===2){ return '<div class="set-tile set-tile-off"><span class="ico">'+t[0]+'</span><span><span class="nm">'+this.esc(t[1])+'</span><span class="ds">'+this.esc(t[3])+'</span></span></div>'; }
       const soon=t[5]?'':'<span class="soon">soon</span>';
       return '<button class="set-tile" onclick="App.openSetting(\''+t[2]+'\')"><span class="ico">'+t[0]+'</span><span><span class="nm">'+this.esc(t[1])+soon+'</span><span class="ds">'+this.esc(t[3])+'</span></span></button>'; };
@@ -2058,11 +2242,11 @@ const App = {
     '<div class="card"><h2>'+this.esc(sub)+'</h2>'+inner+
     '<div class="form-actions">'+(saveFn?'<button class="btn btn-primary" onclick="'+saveFn+'">Update</button>':'')+
     '<button class="btn" onclick="App.settingsBack()">'+(saveFn?'Cancel':'Back to Settings')+'</button></div></div>'; },
-  setStub(sub){ return this.crumb('Settings',sub)+
+  /* Safety net only: every tile in setTiles() has a matching set_* handler.
+     This renders if a tile is ever added without one, instead of a blank page. */
+  setMissing(sub){ return this.crumb('Settings',sub)+
     '<div class="card"><h2>'+this.esc(sub)+'</h2>'+
-    '<div class="info-bar">This setting exists in Manager and is part of the layout here, but isn\u2019t configurable yet in this build. Tell me which one to wire up next and I\u2019ll make it functional.</div>'+
-    (sub==='User Permissions'?'<p class="sub">User accounts are managed in the Users tab at the top.</p><button class="btn" onclick="App.go(\'users\')">Go to Users</button> ':'')+
-    (sub==='Custom Themes'?'<p class="sub">A full drag-and-drop template / theme designer is already available — open a Receipt, Payment, Sales Invoice or Purchase Invoice and click the <b>\u270e Editor</b> button.</p>':'')+
+    '<div class="info-bar">This setting has no editor registered. Add a <code>set_'+this.esc(this.setView||'')+'()</code> method to <code>App</code> in <code>js/app.js</code>.</div>'+
     '<div class="form-actions"><button class="btn" onclick="App.settingsBack()">Back to Settings</button></div></div>'; },
 
   set_business(b){ const d=b.details||{};
@@ -2165,20 +2349,40 @@ const App = {
     var inner, save; if(cat==='templates'){ inner=this._emailTplInner(b); save='App.saveEmailTemplate()'; } else { inner=this._smtpInner(b); save='App.saveSmtp()'; }
     return this.crumb('Settings','Email Settings')+'<div class="card"><h2>Email Settings</h2>'+tabs+inner+'<div class="form-actions"><button class="btn btn-primary" onclick="'+save+'">Update</button><button class="btn" onclick="App.settingsBack()">Back to Settings</button></div></div>'; },
   emailCatSet(c){ this.emailCat=c; this.renderMain(this.curBiz()); },
-  _smtpInner(b){ var e=(b.details&&b.details.email)||{}; var enc=e.encryption||'TLS';
-    var inner='<div class="info-bar">Outgoing mail server used when emailing invoices, statements, receipts and payments. Document PDFs are produced in‑app; these details deliver them where a mail relay is available. The message wording comes from <b>Email Templates</b>.</div>'+
+  _smtpInner(b){ var e=(b.details&&b.details.email)||{}; var enc=e.encryption||'TLS'; var mode=e.mode||'mailto';
+    var modeOpts=this.EMAIL_MODES.map(function(m){ return '<option value="'+m[0]+'"'+(mode===m[0]?' selected':'')+'>'+m[1]+'</option>'; }).join('');
+    var smtpNote = mode==='relay'
+      ? '<div class="info-bar">These credentials are forwarded to your relay with each message. The relay does the SMTP delivery.</div>'
+      : '<div class="em-warn">Not used in mail-client mode — your mail client sends with its own account. They are kept for when you switch to a relay.</div>';
+    var inner='<div class="info-bar">A web page cannot open an SMTP connection itself, so choose how messages leave this app. '+
+        'The wording comes from <b>Email Templates</b>; every send is recorded under <b>Emails</b>.</div>'+
+      '<label class="fld">Delivery method</label><select id="em_mode" onchange="App.saveSmtp(1)">'+modeOpts+'</select>'+
+      (mode==='relay'
+        ? '<label class="fld">Relay endpoint URL</label><input id="em_relay" type="text" value="'+this.esc(e.relayUrl||'')+'" placeholder="https://mail.yourcompany.com/send">'+
+          '<div class="sub" style="margin:4px 0 0">A small service you run that accepts <code>POST</code> JSON <code>{to, subject, body, from, smtp:{…}}</code> and sends it. It must allow this origin via CORS.</div>'
+        : '<div class="sub" style="margin:4px 0 0">Opens your desktop mail client with the message pre-filled. Attachments must be added by you — a web page cannot attach files to a <code>mailto:</code> link.</div>')+
       '<label class="fld">From name</label><input id="em_from" type="text" value="'+this.esc(e.fromName||b.name||'')+'">'+
       '<label class="fld">From email address</label><input id="em_addr" type="text" value="'+this.esc(e.fromAddr||'')+'" placeholder="accounts@yourcompany.com">'+
       '<label class="fld">Reply-to address</label><input id="em_reply" type="text" value="'+this.esc(e.replyTo||'')+'">'+
+      '<div class="set-secn-label" style="margin-top:18px">SMTP server</div>'+smtpNote+
       '<label class="fld">SMTP host</label><input id="em_host" type="text" value="'+this.esc(e.smtpHost||'')+'" placeholder="smtp.example.com">'+
       '<label class="fld">SMTP port</label><input id="em_port" type="text" value="'+this.esc(e.smtpPort||'')+'" placeholder="587">'+
       '<label class="fld">SMTP username</label><input id="em_user" type="text" value="'+this.esc(e.smtpUser||'')+'">'+
       '<label class="fld">SMTP password</label><input id="em_pass" type="password" value="'+this.esc(e.smtpPass||'')+'">'+
-      '<label class="fld">Encryption</label><select id="em_enc">'+['None','SSL','TLS'].map(function(o){ return '<option'+(enc===o?' selected':'')+'>'+o+'</option>'; }).join('')+'</select>';
+      '<label class="fld">Encryption</label><select id="em_enc">'+['None','SSL','TLS'].map(function(o){ return '<option'+(enc===o?' selected':'')+'>'+o+'</option>'; }).join('')+'</select>'+
+      '<div class="em-warn" style="margin-top:12px">The password is stored in this browser’s localStorage in plain text, readable by any script on this origin. Use an app-specific password, not your main mailbox password.</div>';
     return inner; },
-  saveSmtp(){ var b=this.curBiz(); if(!b) return; var g=function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
-    var em=Object.assign({},(b.details&&b.details.email)||{},{fromName:g('em_from'),fromAddr:g('em_addr'),replyTo:g('em_reply'),smtpHost:g('em_host'),smtpPort:g('em_port'),smtpUser:g('em_user'),smtpPass:g('em_pass'),encryption:(document.getElementById('em_enc')||{}).value||'TLS'});
-    b.details=Object.assign({},b.details,{email:em}); this.saveBiz(b); try{ this.toast&&this.toast('SMTP settings saved'); }catch(e){} this.renderMain(b); },
+  /* quiet=1 when re-rendering after a mode switch, so it doesn't toast on every change */
+  saveSmtp(quiet){ var b=this.curBiz(); if(!b) return; var g=function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
+    var sel=function(id,d){ var el=document.getElementById(id); return (el&&el.value)||d; };
+    var em=Object.assign({},(b.details&&b.details.email)||{},{
+      mode:sel('em_mode','mailto'), relayUrl:g('em_relay')||((b.details&&b.details.email&&b.details.email.relayUrl)||''),
+      fromName:g('em_from'),fromAddr:g('em_addr'),replyTo:g('em_reply'),
+      smtpHost:g('em_host'),smtpPort:g('em_port'),smtpUser:g('em_user'),smtpPass:g('em_pass'),
+      encryption:sel('em_enc','TLS')});
+    b.details=Object.assign({},b.details,{email:em}); this.saveBiz(b);
+    if(!quiet){ try{ this.toast&&this.toast('Email settings saved'); }catch(e){} }
+    this.renderMain(b); },
   _emTplTypes(){ return [['default','Default (all documents)'],['salesInv','Sales Invoice'],['purchInv','Purchase Invoice'],['salesQuotes','Sales Quote'],['receipts','Receipt'],['payments','Payment'],['custStmt','Customer Statement'],['supStmt','Supplier Statement']]; },
   _emTplDefault(type){ var subs={'default':'{business} — your document','salesInv':'Invoice {ref} from {business}','purchInv':'Purchase invoice {ref}','salesQuotes':'Quote {ref} from {business}','receipts':'Receipt {ref} from {business}','payments':'Payment advice {ref}','custStmt':'Statement of account — {business}','supStmt':'Supplier statement — {business}'};
     return {subject:(subs[type]||subs['default']), body:'Dear {party},\n\nPlease find attached {document} {ref}.\n\nThank you for your business.\n\n{business}'}; },
@@ -2192,6 +2396,127 @@ const App = {
   _emTplStash(b,type){ var s=document.getElementById('et_subject'), bd=document.getElementById('et_body'); if(!s&&!bd) return; b.emailTemplates=b.emailTemplates||{}; b.emailTemplates[type]={subject:s?s.value:'',body:bd?bd.value:''}; },
   emTplPick(v){ var b=this.curBiz(); if(!b) return; this._emTplStash(b,this._emTplType||'default'); this._emTplType=v; this.saveBiz(b); this.renderMain(b); },
   saveEmailTemplate(){ var b=this.curBiz(); if(!b) return; this._emTplStash(b,this._emTplType||'default'); this.saveBiz(b); try{ this.toast&&this.toast('Email template saved'); }catch(e){} this.renderMain(b); },
+
+  /* ===================== email delivery =====================
+     A page served over http(s) cannot open an SMTP socket, so there are exactly
+     two ways this app can deliver mail:
+       mailto — hand the composed message to the user's own mail client.
+                Always available; cannot carry an attachment (RFC 6068), so the
+                PDF is saved separately and attached by the user.
+       relay  — POST the message to an HTTP endpoint the user runs, which does
+                the actual SMTP talking with the credentials stored here.
+     Every send is written to the Emails log either way.                        */
+  EMAIL_MODES:[['mailto','Mail client (mailto:)'],['relay','HTTP relay endpoint']],
+  emailCfg(b){ return (b&&b.details&&b.details.email)||{}; },
+  emailMode(b){ return this.emailCfg(b).mode||'mailto'; },
+
+  _emFill(tpl,vars){ return String(tpl==null?'':tpl).replace(/\{(\w+)\}/g,function(m,k){
+    return vars[k]!=null&&vars[k]!=='' ? String(vars[k]) : m; }); },
+  /* Look up a party's stored email by the name held on the record. */
+  _partyEmail(b,listKey,name){ if(!name) return '';
+    var list=(b.records&&b.records[listKey])||[]; var n=String(name).trim().toLowerCase();
+    var hit=list.find(function(p){ return String(p.name||'').trim().toLowerCase()===n; });
+    return (hit&&hit.email)||''; },
+  emailVars(b,key,rec){ rec=rec||{};
+    var party=rec.customer||rec.supplier||rec.employee||rec.paidBy||rec.payee||rec.name||'';
+    var amt=rec.total!=null?rec.total:(rec.amount!=null?rec.amount:(rec.netPay!=null?rec.netPay:''));
+    return { business:(b&&b.name)||'', party:party||'Sir/Madam',
+      document:(this.fmtFormName?this.fmtFormName(key):key)||'document',
+      ref:rec.reference||rec.number||rec.code||String(rec.id||''),
+      amount:(amt===''?'':this.money(amt)), date:this.fmtDateUS(rec.issueDate||rec.date||'') }; },
+  emailTplFor(b,type){ var t=((b&&b.emailTemplates)||{})[type];
+    var d=this._emTplDefault(type);
+    return { subject:(t&&t.subject!=null&&t.subject!=='')?t.subject:d.subject,
+             body:(t&&t.body!=null&&t.body!=='')?t.body:d.body }; },
+
+  /* Open the composer for the record currently on screen. */
+  emailDoc(){ var b=this.curBiz(); if(!b) return;
+    var key=LABEL2KEY[this.wsSection]; var rec=(this.records(b)||[]).find(r=>String(r.id)===String(this.editingId));
+    if(!rec){ alert('Open a document first.'); return; }
+    var tplType=this.emailTplFor(b,key)&&this._emTplTypes().some(t=>t[0]===key)?key:'default';
+    var vars=this.emailVars(b,key,rec); var tpl=this.emailTplFor(b,tplType);
+    var to=this._partyEmail(b,'customers',rec.customer)||this._partyEmail(b,'suppliers',rec.supplier)||
+           this._partyEmail(b,'employees',rec.employee)||'';
+    this.emailCompose({ to:to, subject:this._emFill(tpl.subject,vars), body:this._emFill(tpl.body,vars),
+      docLabel:this._recLabel(key,rec), attachHint:true }); },
+
+  /* Reports have no party, so the recipient starts blank. */
+  reportEmail(){ var b=this.curBiz(); if(!b) return;
+    var title=(this._repCtx&&this._repCtx.inst&&this._repCtx.inst.name)||'Report';
+    var vars={ business:b.name||'', party:'Sir/Madam', document:title, ref:'', amount:'', date:this.fmtDateUS(new Date().toISOString().slice(0,10)) };
+    var tpl=this.emailTplFor(b,'default');
+    this.emailCompose({ to:'', subject:this._emFill(tpl.subject,vars), body:this._emFill(tpl.body,vars),
+      docLabel:title, attachHint:true }); },
+
+  emailCompose(o){ o=o||{}; var b=this.curBiz(); var cfg=this.emailCfg(b); var mode=this.emailMode(b);
+    this._emDraft={ docLabel:o.docLabel||'' };
+    var modeOpts=this.EMAIL_MODES.map(function(m){ return '<option value="'+m[0]+'"'+(mode===m[0]?' selected':'')+'>'+m[1]+'</option>'; }).join('');
+    var note = mode==='relay'
+      ? (cfg.relayUrl
+          ? '<div class="info-bar">Will POST to your relay at <code>'+this.esc(cfg.relayUrl)+'</code>, which sends it over SMTP.</div>'
+          : '<div class="em-warn">No relay URL configured. Set one in Settings → Email Settings, or switch to the mail client below.</div>')
+      : '<div class="info-bar">Opens your mail client with this message ready to send. <b>Attachments cannot be pre-filled by a web page</b> — use <b>Save PDF</b> below, then attach the file before sending.</div>';
+    if(!cfg.fromAddr) note+='<div class="em-warn">No “from” address set — add one in Settings → Email Settings.</div>';
+    this._openOverlay('<div class="app-modal-h">Email '+this.esc(o.docLabel||'document')+'</div>'+
+      '<div class="app-modal-b">'+note+
+        '<label class="fld">Delivery</label><select id="em_mode" onchange="App.emailModeSet(this.value)">'+modeOpts+'</select>'+
+        '<label class="fld">To</label><input id="em_to" type="text" value="'+this.esc(o.to||'')+'" placeholder="name@example.com">'+
+        '<label class="fld">Subject</label><input id="em_subj" type="text" value="'+this.esc(o.subject||'')+'">'+
+        '<label class="fld">Message</label><textarea id="em_body" rows="9">'+this.esc(o.body||'')+'</textarea>'+
+      '</div>'+
+      '<div class="app-modal-f">'+
+        (o.attachHint?'<button class="btn btn-xs" onclick="App.emailSavePdf()">⬇ Save PDF</button>':'')+
+        '<span style="flex:1"></span>'+
+        '<button class="btn" onclick="App._closeOverlay()">Cancel</button>'+
+        '<button class="btn btn-primary" onclick="App.emailSend()">Send</button>'+
+      '</div>'); },
+  emailModeSet(m){ var b=this.curBiz(); if(!b) return;
+    b.details=Object.assign({},b.details,{email:Object.assign({},this.emailCfg(b),{mode:m})});
+    this.saveBiz(b);
+    var d=this._emDraft||{}; var g=function(id){ var el=document.getElementById(id); return el?el.value:''; };
+    this.emailCompose({ to:g('em_to'), subject:g('em_subj'), body:g('em_body'), docLabel:d.docLabel, attachHint:true }); },
+  emailSavePdf(){ this._closeOverlay(); try{ this.pdfView?this.pdfView():this.printView(); }catch(e){ try{ this.printView(); }catch(_){ } } },
+
+  emailSend(){ var b=this.curBiz(); if(!b) return; var self=this;
+    var g=function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
+    var to=g('em_to'), subject=g('em_subj'), body=document.getElementById('em_body')?document.getElementById('em_body').value:'';
+    if(!to){ alert('Enter a recipient address.'); return; }
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)){ alert('“'+to+'” is not a valid email address.'); return; }
+    var cfg=this.emailCfg(b); var mode=cfg.mode||'mailto';
+    if(mode==='relay'){
+      if(!cfg.relayUrl){ alert('No relay URL configured. Set one in Settings → Email Settings, or switch to the mail client.'); return; }
+      this._emailViaRelay(b,cfg,{to:to,subject:subject,body:body});
+    } else {
+      var href=this._mailtoHref(cfg,{to:to,subject:subject,body:body});
+      try{ window.location.href=href; }catch(e){}
+      this._emailLog(b,{to:to,subject:subject,body:body,status:'Handed to mail client',mode:'mailto'});
+      this._closeOverlay();
+      try{ this.toast&&this.toast('Opened in your mail client'); }catch(e){}
+    } },
+  /* Split out so it can be exercised without actually launching a mail client. */
+  _mailtoHref(cfg,msg){ cfg=cfg||{};
+    var q=['subject='+encodeURIComponent(msg.subject||''),'body='+encodeURIComponent(msg.body||'')];
+    if(cfg.replyTo) q.push('reply-to='+encodeURIComponent(cfg.replyTo));
+    return 'mailto:'+encodeURIComponent(msg.to||'')+'?'+q.join('&'); },
+  _emailViaRelay(b,cfg,msg){ var self=this;
+    var btns=document.querySelectorAll('#appOverlay .app-modal-f .btn');
+    btns.forEach(function(x){ x.disabled=true; });
+    var payload={ to:msg.to, subject:msg.subject, body:msg.body,
+      from:cfg.fromAddr||'', fromName:cfg.fromName||b.name||'', replyTo:cfg.replyTo||'',
+      smtp:{ host:cfg.smtpHost||'', port:cfg.smtpPort||'', user:cfg.smtpUser||'',
+             pass:cfg.smtpPass||'', encryption:cfg.encryption||'TLS' } };
+    fetch(cfg.relayUrl,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
+      .then(function(r){ if(!r.ok) throw new Error('relay responded '+r.status+' '+r.statusText); return r.text(); })
+      .then(function(){ self._emailLog(b,{to:msg.to,subject:msg.subject,body:msg.body,status:'Sent',mode:'relay'});
+        self._closeOverlay(); try{ self.toast&&self.toast('Email sent'); }catch(e){ alert('Email sent.'); } })
+      .catch(function(err){ btns.forEach(function(x){ x.disabled=false; });
+        self._emailLog(b,{to:msg.to,subject:msg.subject,body:msg.body,status:'Failed',mode:'relay',error:err.message});
+        alert('Could not send via the relay:\n\n'+err.message+'\n\nThe attempt has been recorded in the Emails log.'); }); },
+  _emailLog(b,m){ b.records=b.records||{}; b.records.emails=b.records.emails||[];
+    b.records.emails.unshift({ id:this.uuid(), ts:new Date().toISOString(), recipient:m.to,
+      subject:m.subject, body:m.body, status:m.status, mode:m.mode, error:m.error||'' });
+    if(b.records.emails.length>500) b.records.emails.length=500;
+    this.saveBiz(b); },
 
   set_divisions(b){ var self=this; var divs=b.divisions||[];
     var rows=divs.map(function(d,i){ return '<div class="tax-row"><input class="nm" type="text" value="'+self.esc(d.name||'')+'" placeholder="Division name" onchange="App.divSet('+i+',\'name\',this.value)">'+
@@ -2857,7 +3182,7 @@ const App = {
         '<label class="fld">Group</label><select id="coa_parent">'+optsHtml+'</select>'+
         (ctx.side==='pl'&&!gopts.length?'<div style="color:#999;font-size:12px;margin-top:4px">No Profit &amp; Loss groups yet — an \u201cUncategorised\u201d income group will be created for this account. Add Income/Expense groups via New Group.</div>':'')+
         '<label class="fld">Starting balance</label><input id="coa_bal" type="text" inputmode="decimal" value="'+(node&&node.balance?node.balance:'')+'" placeholder="0.00">'+
-        (node&&node.control?'<div style="color:#999;font-size:12px;margin-top:6px">This is a control account; its balance will come from its subsidiary ledger in a later step.</div>':''); }
+        (node&&node.control?'<div style="color:#999;font-size:12px;margin-top:6px">This is a control account. Its balance is this starting figure plus the movements in its subsidiary ledger (customers, suppliers, bank &amp; cash accounts, and so on), so it updates automatically as you post transactions.</div>':''); }
     const canDel=node&&ctx.kind!=='section'&&!node.mandatory&&!node.control&&!(ctx.kind==='group'&&b.coa.some(n=>n.parent===node.id));
     const del=(node&&ctx.kind!=='section')?('<button class="btn btn-danger" style="margin-left:auto" onclick="App.coaDelete(\''+node.id+'\')"'+(canDel?'':' disabled')+'>Delete</button>'):'';
     return this.crumb('Settings','Chart of Accounts ▸ '+(node||ctx.kind==='section'?'Edit':'New'))+

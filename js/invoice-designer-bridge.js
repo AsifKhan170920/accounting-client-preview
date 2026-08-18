@@ -4,7 +4,11 @@
   var INVOICE_DOCS = {
     salesInv: 1, purchInv: 1, salesQuotes: 1, purchQuotes: 1,
     salesOrders: 1, purchOrders: 1, creditNotes: 1, debitNotes: 1, deliveryNotes: 1,
+    goodsRec: 1,
   };
+  /* purchase-side documents — the party is a supplier, not a customer */
+  var PURCHASE_DOCS = ['purchInv', 'purchQuotes', 'purchOrders', 'debitNotes', 'goodsRec'];
+  function isPurchaseDoc(key) { return PURCHASE_DOCS.indexOf(key) >= 0; }
 
   function readStore() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (e) { return {}; }
@@ -104,7 +108,7 @@
       if (M.mapRecordToInvoiceData) {
         var recs = App.records(b) || [];
         var rec = recs.length ? recs[recs.length - 1] : {};
-        var isP = ['purchInv', 'purchQuotes', 'purchOrders', 'debitNotes'].indexOf(key) >= 0;
+        var isP = isPurchaseDoc(key);
         sample = M.mapRecordToInvoiceData(b, rec, {
           isPurchase: isP,
           amountInWords: function (n, cur) {
@@ -135,7 +139,7 @@
   App._invoiceDesignData = function (b, key, rec) {
     var M = mod();
     if (!M || !M.mapRecordToInvoiceData) return {};
-    var isP = ['purchInv', 'purchQuotes', 'purchOrders', 'debitNotes', 'goodsRec'].indexOf(key) >= 0;
+    var isP = isPurchaseDoc(key);
     return M.mapRecordToInvoiceData(b, rec || {}, {
       isPurchase: isP,
       amountInWords: function (n, cur) {
