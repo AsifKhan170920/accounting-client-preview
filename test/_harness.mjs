@@ -74,7 +74,9 @@ export function loadApp({ storage = {} } = {}) {
       querySelectorAll: () => [],
       querySelector: () => null,
       createElement: (tag) => makeNode(tag),
-      body: { appendChild() {}, removeChild() {} },
+      /* a real node, so code that toggles a class on <body> (the mobile nav
+         drawer) works and tests can assert on it */
+      body: makeNode('body'),
     },
     window: {},
     setTimeout,
@@ -92,7 +94,7 @@ export function loadApp({ storage = {} } = {}) {
   // bindings, and `const App = …` / `const DB = …` are lexical, so they are not
   // reachable as globals until we publish them explicitly at the end.
   const FILES = ['js/data.js', 'js/accounting.js', 'js/app.js'];
-  const EXPORTS = ['App', 'DB', 'SIDEBAR', 'SIDEBAR_FOOT', 'LABEL2KEY', 'KEY2LABEL', 'REG', 'CUR'];
+  const EXPORTS = ['App', 'DB', 'SIDEBAR', 'SIDEBAR_FOOT', 'SIDEBAR_GROUPS', 'LABEL2KEY', 'KEY2LABEL', 'REG', 'CUR'];
   const source =
     FILES.map((f) => `/* ==== ${f} ==== */\n` + readFileSync(join(ROOT, f), 'utf8')).join('\n;\n') +
     `\n;(function(){ ${EXPORTS.map((n) => `try{ globalThis.${n} = ${n}; }catch(e){}`).join(' ')} })();`;

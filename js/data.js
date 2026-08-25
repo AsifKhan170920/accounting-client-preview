@@ -9,15 +9,42 @@ const DB = {
 const SIDEBAR = [
   ['📊','Summary',null],['🏦','Bank and Cash Accounts','bankCash'],['🧾','Receipts','receipts'],
   ['💳','Payments','payments'],['🔁','Inter Account Transfers','iat'],['☑️','Bank Reconciliations','bankRec'],
+  ['🧳','Expense Claims','expenseClaims'],
   ['👤','Customers','customers'],['🗒️','Sales Quotes','salesQuotes'],['📑','Sales Orders','salesOrders'],
-  ['🧾','Sales Invoices','salesInv'],['📄','Credit Notes','creditNotes'],['🚛','Delivery Notes','deliveryNotes'],['🚚','Suppliers','suppliers'],
+  ['🧾','Sales Invoices','salesInv'],['📄','Credit Notes','creditNotes'],['🚛','Delivery Notes','deliveryNotes'],
+  ['⏱️','Billable Time','billableTime'],['🧮','Withholding Tax Receipts','whtReceipts'],
+  ['🚚','Suppliers','suppliers'],
   ['🗒️','Purchase Quotes','purchQuotes'],['📑','Purchase Orders','purchOrders'],['🧾','Purchase Invoices','purchInv'],
   ['📄','Debit Notes','debitNotes'],['📦','Goods Receipts','goodsRec'],['🏷️','Inventory Items','inventory'],
+  ['🔀','Inventory Transfers','invTransfers'],['🗑️','Inventory Write-offs','invWriteOffs'],
+  ['🏭','Production Orders','production'],['🧷','Non-inventory Items','nonInvItems'],
   ['🧑','Employees','employees'],['💵','Payslips','payslips'],['🏗️','Fixed Assets','fixedAssets'],
-  ['📉','Depreciation Entries','depreciation'],['🏛️','Capital Accounts','capital'],['⭐','Special Accounts','special'],
+  ['📉','Depreciation Entries','depreciation'],
+  ['💡','Intangible Assets','intangibles'],['📐','Amortization Entries','amortization'],
+  ['🏛️','Capital Accounts','capital'],['⭐','Special Accounts','special'],
+  ['💹','Investments','investments'],
   ['📚','Journal Entries','journal'],
 ];
 const SIDEBAR_FOOT = [['📈','Reports'],['⚙️','Settings']];
+/* Presentation only: how the sidebar groups the sections above. Labels here are
+   the same routing keys as SIDEBAR — never rename one, it is what
+   selectSection(), Customize and sidebarHidden all key off. Anything not listed
+   still renders, under "More", so adding a tab can't make it disappear. */
+const SIDEBAR_GROUPS = [
+  ['Overview',   ['Summary']],
+  ['Sales',      ['Customers','Sales Quotes','Sales Orders','Sales Invoices','Credit Notes',
+                  'Delivery Notes','Billable Time','Withholding Tax Receipts']],
+  ['Purchases',  ['Suppliers','Purchase Quotes','Purchase Orders','Purchase Invoices',
+                  'Debit Notes','Goods Receipts','Expense Claims']],
+  ['Banking',    ['Bank and Cash Accounts','Receipts','Payments','Inter Account Transfers',
+                  'Bank Reconciliations']],
+  ['Inventory',  ['Inventory Items','Inventory Transfers','Inventory Write-offs',
+                  'Production Orders','Non-inventory Items']],
+  ['Payroll',    ['Employees','Payslips']],
+  ['Assets',     ['Fixed Assets','Depreciation Entries','Intangible Assets',
+                  'Amortization Entries','Investments']],
+  ['Accounting', ['Capital Accounts','Special Accounts','Journal Entries']],
+];
 const LABEL2KEY = {}; SIDEBAR.forEach(([i,l,k])=>{ if(k) LABEL2KEY[l]=k; });
 const KEY2LABEL = {}; Object.keys(LABEL2KEY).forEach(l=>{ if(!KEY2LABEL[LABEL2KEY[l]]) KEY2LABEL[LABEL2KEY[l]]=l; });
 
@@ -219,6 +246,113 @@ const REG = {
     columns:[{key:'name',label:'Name',kind:'text'},{key:'balance',label:'Balance',kind:'money',r:1,color:'blue'}],
     form:[{key:'name',label:'Name',type:'text',req:1},{key:'balance',label:'Starting balance',type:'money'}],
     totalCol:'balance'},
+
+  /* ---------- expense claims ---------- */
+  expenseClaims:{label:'Expense Claims', singular:'Expense Claim', newLabel:'New Expense Claim',
+    columns:[{key:'date',label:'Date',kind:'date'},{key:'reference',label:'Reference',kind:'text'},
+      {key:'payer',label:'Payer',kind:'text'},{key:'description',label:'Description',kind:'text'},
+      {key:'amount',label:'Amount',kind:'money',r:1,bold:1}],
+    form:[{key:'date',label:'Date',type:'date',req:1},{key:'reference',label:'Reference',type:'text'},
+      {key:'payer',label:'Paid by',type:'text'},{key:'description',label:'Description',type:'text'}],
+    lines:{kind:'cash'}, totalCol:'amount', extraFoot:['Expense Claims - Lines']},
+
+  /* ---------- billable time ---------- */
+  billableTime:{label:'Billable Time', singular:'Billable Time Entry', newLabel:'New Billable Time',
+    columns:[{key:'date',label:'Date',kind:'date'},{key:'employee',label:'Employee',kind:'text'},
+      {key:'customer',label:'Customer',kind:'text'},{key:'description',label:'Description',kind:'text'},
+      {key:'hours',label:'Hours',kind:'text',r:1},
+      {key:'amount',label:'Amount',kind:'money',r:1,color:'blue',calc:r=>billableAmount(r)},
+      {key:'status',label:'Status',kind:'status',calc:r=>r.status||'Uninvoiced'}],
+    form:[{key:'date',label:'Date',type:'date',req:1},{key:'employee',label:'Employee',type:'ref',from:'employees'},
+      {key:'customer',label:'Customer',type:'ref',from:'customers'},{key:'description',label:'Description',type:'text'},
+      {key:'hours',label:'Hours',type:'number'},{key:'rate',label:'Billable rate',type:'money'},
+      {key:'status',label:'Status',type:'select',options:['Uninvoiced','Invoiced','Written off']}],
+    totalCol:'amount'},
+
+  /* ---------- withholding tax receipts ---------- */
+  whtReceipts:{label:'Withholding Tax Receipts', singular:'Withholding Tax Receipt', newLabel:'New Withholding Tax Receipt',
+    columns:[{key:'date',label:'Date',kind:'date'},{key:'reference',label:'Reference',kind:'text'},
+      {key:'customer',label:'Customer',kind:'text'},{key:'invoice',label:'Sales invoice',kind:'text'},
+      {key:'amount',label:'Amount',kind:'money',r:1,bold:1}],
+    form:[{key:'date',label:'Date',type:'date',req:1},{key:'reference',label:'Reference',type:'text'},
+      {key:'customer',label:'Customer',type:'ref',from:'customers'},{key:'invoice',label:'Sales invoice',type:'text'},
+      {key:'amount',label:'Amount withheld',type:'money',req:1},{key:'description',label:'Description',type:'text'}],
+    totalCol:'amount'},
+
+  /* ---------- inventory transfers ---------- */
+  invTransfers:{label:'Inventory Transfers', singular:'Inventory Transfer', newLabel:'New Inventory Transfer',
+    columns:[{key:'date',label:'Date',kind:'date'},{key:'reference',label:'Reference',kind:'text'},
+      {key:'fromLocation',label:'From location',kind:'text'},{key:'toLocation',label:'To location',kind:'text'},
+      {key:'description',label:'Description',kind:'text'},
+      {key:'qtyTotal',label:'Qty transferred',kind:'text',r:1,calc:r=>App.numStr(lineQtyTotal(r))}],
+    form:[{key:'date',label:'Date',type:'date',req:1},{key:'reference',label:'Reference',type:'text'},
+      {key:'fromLocation',label:'From location',type:'ref',from:'locations'},
+      {key:'toLocation',label:'To location',type:'ref',from:'locations'},
+      {key:'description',label:'Description',type:'text'}],
+    lines:{kind:'qty'}, extraFoot:['Inventory Transfers - Lines']},
+
+  /* ---------- inventory write-offs ---------- */
+  invWriteOffs:{label:'Inventory Write-offs', singular:'Inventory Write-off', newLabel:'New Inventory Write-off',
+    columns:[{key:'date',label:'Date',kind:'date'},{key:'reference',label:'Reference',kind:'text'},
+      {key:'description',label:'Description',kind:'text'},
+      {key:'amount',label:'Amount written off',kind:'money',r:1,color:'blue',calc:r=>writeOffValue(App.curBiz(),r)}],
+    form:[{key:'date',label:'Date',type:'date',req:1},{key:'reference',label:'Reference',type:'text'},
+      {key:'account',label:'Write-off account',type:'account'},{key:'description',label:'Description',type:'text'}],
+    lines:{kind:'writeoff'}, totalCol:'amount', extraFoot:['Inventory Write-offs - Lines']},
+
+  /* ---------- production orders ---------- */
+  production:{label:'Production Orders', singular:'Production Order', newLabel:'New Production Order',
+    columns:[{key:'date',label:'Date',kind:'date'},{key:'reference',label:'Reference',kind:'text'},
+      {key:'item',label:'Finished item',kind:'text'},{key:'qty',label:'Qty produced',kind:'text',r:1},
+      {key:'cost',label:'Production cost',kind:'money',r:1,color:'blue',calc:r=>productionCost(App.curBiz(),r)}],
+    form:[{key:'date',label:'Date',type:'date',req:1},{key:'reference',label:'Reference',type:'text'},
+      {key:'item',label:'Finished item',type:'ref',from:'inventory'},{key:'qty',label:'Quantity produced',type:'number',req:1},
+      {key:'extraCost',label:'Additional (non-inventory) cost',type:'money'},
+      {key:'description',label:'Description',type:'text'}],
+    lines:{kind:'qty'}, extraFoot:['Production Orders - Lines']},
+
+  /* ---------- non-inventory items ---------- */
+  nonInvItems:{label:'Non-inventory Items', singular:'Non-inventory Item', newLabel:'New Non-inventory Item',
+    columns:[{key:'code',label:'Item code',kind:'text'},{key:'name',label:'Name',kind:'text'},
+      {key:'unit',label:'Unit',kind:'text'},
+      {key:'salesPrice',label:'Sale price',kind:'money',r:1},{key:'purchasePrice',label:'Purchase price',kind:'money',r:1}],
+    form:[{key:'code',label:'Item code',type:'text'},{key:'name',label:'Name',type:'text',req:1},
+      {key:'unit',label:'Unit name',type:'text'},
+      {key:'salesPrice',label:'Sale price',type:'money'},{key:'salesAccount',label:'Sale account',type:'account'},
+      {key:'purchasePrice',label:'Purchase price',type:'money'},{key:'purchaseAccount',label:'Purchase account',type:'account'},
+      {key:'taxCode',label:'Tax code',type:'text'}]},
+
+  /* ---------- intangible assets ---------- */
+  intangibles:{label:'Intangible Assets', singular:'Intangible Asset', newLabel:'New Intangible Asset',
+    columns:[{key:'name',label:'Name',kind:'text'},{key:'acqDate',label:'Acquisition date',kind:'date'},
+      {key:'cost',label:'Acquisition cost',kind:'money',r:1,calc:r=>iaCost(App.curBiz(),r)},
+      {key:'accumAmort',label:'Accumulated amortization',kind:'money',r:1,calc:r=>iaAccumAmort(App.curBiz(),r)},
+      {key:'book',label:'Book value',kind:'money',r:1,color:'blue',ledger:1,calc:r=>iaBookValue(App.curBiz(),r)}],
+    form:[{key:'name',label:'Name',type:'text',req:1},{key:'acqDate',label:'Acquisition date',type:'date'},
+      {key:'cost',label:'Acquisition cost',type:'money'},{key:'accumAmort',label:'Accumulated amortization (opening)',type:'money'}],
+    totalCol:'book'},
+
+  /* ---------- amortization entries ---------- */
+  amortization:{label:'Amortization Entries', singular:'Amortization Entry', newLabel:'New Amortization Entry',
+    columns:[{key:'date',label:'Date',kind:'date'},{key:'reference',label:'Reference',kind:'text'},
+      {key:'description',label:'Description',kind:'text'},{key:'amount',label:'Total',kind:'money',r:1}],
+    form:[{key:'date',label:'Date',type:'date',req:1},{key:'reference',label:'Reference',type:'text'},
+      {key:'method',label:'Amortization method',type:'select',options:['Straight-line','Reducing balance']},
+      {key:'description',label:'Description',type:'text'}],
+    lines:{kind:'amort'}, totalCol:'amount', extraFoot:['Amortization Entries - Lines']},
+
+  /* ---------- investments ---------- */
+  investments:{label:'Investments', singular:'Investment', newLabel:'New Investment',
+    columns:[{key:'name',label:'Name',kind:'text'},{key:'symbol',label:'Code / symbol',kind:'text'},
+      {key:'qty',label:'Qty on hand',kind:'text',r:1},
+      {key:'cost',label:'Cost',kind:'money',r:1,calc:r=>investCost(App.curBiz(),r)},
+      {key:'marketValue',label:'Market value',kind:'money',r:1,calc:r=>investMarketValue(r)},
+      {key:'gain',label:'Unrealised gain (loss)',kind:'money',r:1,color:'blue',ledger:1,calc:r=>investGain(App.curBiz(),r)}],
+    form:[{key:'name',label:'Name',type:'text',req:1},{key:'symbol',label:'Code / symbol',type:'text'},
+      {key:'qty',label:'Quantity on hand',type:'number'},{key:'cost',label:'Cost (total)',type:'money'},
+      {key:'marketPrice',label:'Market price per unit',type:'money'},
+      {key:'controlAccount',label:'Control account',type:'text'}],
+    totalCol:'gain'},
 
   journal:{label:'Journal Entries', singular:'Journal Entry', newLabel:'New Journal Entry',
     columns:[{key:'date',label:'Date',kind:'date'},{key:'reference',label:'Reference',kind:'text'},
