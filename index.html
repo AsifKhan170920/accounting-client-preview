@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Manager — Accounting</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/form-editor-embedded.css">
 </head>
@@ -32,13 +32,13 @@
 <!-- APP -->
 <div id="app" class="hide">
   <div class="toolbar">
-    <span class="tb-corner left"><span class="tb-ico">🅰</span></span>
-    <button class="tb-btn" id="tabBiz" onclick="App.go('businesses')"><span class="tb-ico">🏢</span>Businesses</button>
-    <button class="tb-btn" id="tabUsers" onclick="App.go('users')"><span class="tb-ico">👥</span>Users</button>
-    <button class="tb-btn" id="tabSupport" onclick="App.go('support')"><span class="tb-ico">🛟</span>Support</button>
-    <span class="tb-static"><span class="tb-ico">👤</span><span id="userName">Administrator</span></span>
-    <button class="tb-btn" onclick="App.logout()"><span class="tb-ico">⎋</span>Logout</button>
-    <span class="tb-corner right" title="Toggle light / dark theme" style="cursor:pointer" onclick="App.toggleTheme()">◐</span>
+    <span class="tb-corner left"><span class="tb-ico" data-ico="dashboard"></span></span>
+    <button class="tb-btn" id="tabBiz" onclick="App.go('businesses')"><span class="tb-ico" data-ico="briefcase"></span>Businesses</button>
+    <button class="tb-btn" id="tabUsers" onclick="App.go('users')"><span class="tb-ico" data-ico="users"></span>Users</button>
+    <button class="tb-btn" id="tabSupport" onclick="App.go('support')"><span class="tb-ico" data-ico="lifebuoy"></span>Support</button>
+    <span class="tb-static"><span class="tb-ico" data-ico="user"></span><span id="userName">Administrator</span></span>
+    <button class="tb-btn" onclick="App.logout()"><span class="tb-ico" data-ico="logout"></span>Logout</button>
+    <span class="tb-corner right" title="Toggle light / dark theme" style="cursor:pointer" onclick="App.toggleTheme()" data-ico="moon"></span>
   </div>
 
   <div id="pageBusinesses" class="page">
@@ -52,7 +52,7 @@
         </div>
       </div>
       <button class="btn btn-danger" id="removeBtn" onclick="App.removeSelected()" disabled>Remove</button>
-      <div class="search"><span class="ic">🔍</span><input id="bizSearch" type="text" placeholder="Search businesses…" oninput="App.renderBusinesses()"></div>
+      <div class="search"><span class="ic" data-ico="search"></span><input id="bizSearch" type="text" placeholder="Search businesses…" oninput="App.renderBusinesses()"></div>
     </div>
     <div id="bizListWrap"></div>
     <div class="count" id="bizCount"></div>
@@ -80,7 +80,7 @@
     <div class="page-head"><h1 class="page-title">Users</h1></div>
     <div class="actions">
       <button class="btn btn-primary" onclick="App.showNewUser()">New User</button>
-      <div class="search"><span class="ic">🔍</span><input id="userSearch" type="text" placeholder="Search users…" oninput="App.renderUsers()"></div>
+      <div class="search"><span class="ic" data-ico="search"></span><input id="userSearch" type="text" placeholder="Search users…" oninput="App.renderUsers()"></div>
     </div>
     <div id="userListWrap"></div>
     <div class="count" id="userCount"></div>
@@ -110,17 +110,31 @@
   <div id="pageWorkspace" class="hide" style="flex:1;display:flex;flex-direction:column">
     <div class="ws-head">
       <div class="ws-head-left">
-        <span class="ws-close" title="Close business" onclick="App.closeBusiness()">✕</span>
+        <button class="hd-icon nav-toggle" id="navToggle" title="Menu" aria-label="Open navigation"
+          aria-expanded="false" onclick="App.toggleNav()"></button>
+        <span class="ws-close" title="Close business" onclick="App.closeBusiness()"></span>
         <span class="ws-biz-name" id="wsBizName"></span>
         <a onclick="App.renameBusiness()">Rename</a>
       </div>
       <div class="ws-head-right">
+        <div class="hd-search">
+          <input id="wsSearch" type="search" placeholder="Search…" aria-label="Search this business"
+            oninput="App.globalSearch(this.value)" onkeydown="if(event.key==='Escape'){this.value='';App.globalSearch('')}">
+        </div>
+        <button class="hd-icon" id="hdNotify" title="Notifications" aria-label="Notifications"
+          onclick="App.openNotifications()"></button>
+        <button class="hd-icon" title="Toggle light / dark theme" aria-label="Toggle light / dark theme"
+          onclick="App.toggleTheme()" id="hdTheme"></button>
         <button class="btn btn-sm" onclick="App.openTool('emails')">Emails</button>
         <button class="btn btn-sm" onclick="App.openTool('history')">History</button>
         <button class="btn btn-sm" onclick="App.openTool('backup')">Backup</button>
+        <div class="hd-user"><span class="hd-avatar" id="hdAvatar">A</span>
+          <span class="hd-user-txt"><span class="hd-user-name" id="hdUserName">Administrator</span>
+          <span class="hd-user-role" id="hdUserRole">Administrator</span></span></div>
       </div>
     </div>
     <div class="ws-body">
+      <div class="side-scrim" onclick="App.closeNav()"></div>
       <aside class="sidebar" id="sidebar"></aside>
       <main class="ws-main" id="wsMain"></main>
     </div>
@@ -129,6 +143,7 @@
   <div class="foot" id="appFoot">Manager · Steps 1–3 · data is stored locally in this browser</div>
 </div>
 
+<script src="js/icons.js"></script>
 <script src="js/data.js"></script>
 <script src="js/accounting.js"></script>
 <script src="js/app.js"></script>

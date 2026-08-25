@@ -96,7 +96,8 @@ function cashTotal(b){ return ((b.records&&b.records.bankCash)||[]).reduce((a,r)
 function acctNameMatches(b,id,re){ const n=acctById(b,id); return !!(n && re.test(n.name||'')); }
 var AR_RE=/^accounts receivable$/i, AP_RE=/^accounts payable$/i, CAP_RE=/^capital accounts$/i, EMP_RE=/^employee clearing account$/i, INV_RE=/^inventory on hand$/i, FAC_RE=/^fixed assets, at cost$/i;
 function acctIsARorAP(b,id){ return acctNameMatches(b,id,AR_RE)||acctNameMatches(b,id,AP_RE); }
-function acctNeedsSub(b,id){ const n=acctById(b,id); if(!n) return false; const nm=n.name||''; return AR_RE.test(nm)||AP_RE.test(nm)||CAP_RE.test(nm)||EMP_RE.test(nm)||INV_RE.test(nm)||FAC_RE.test(nm); }
+function acctNeedsSub(b,id){ const n=acctById(b,id); if(!n) return false; const nm=n.name||''; return AR_RE.test(nm)||AP_RE.test(nm)||CAP_RE.test(nm)||EMP_RE.test(nm)||INV_RE.test(nm)||FAC_RE.test(nm)||SUB_EXTRA_RE.test(nm); }
+var SUB_EXTRA_RE=/^(expense claims|intangible assets, at cost|investments)$/i;
 // a posting line "completes" only if it has a valid account AND (if that account is a control account) a sub-account is chosen; otherwise it routes to Suspense
 function lineComplete(b,ln){ if(!ln||!ln.account||!acctById(b,ln.account)) return false; if(acctNeedsSub(b,ln.account) && (ln.sub==null||ln.sub==='')) return false; return true; }
 function cashLineSumSub(b,recsKey,re){ const R=b.records||{}; let s=0; (R[recsKey]||[]).forEach(r=>{ const lns=(r.lines&&r.lines.length)?r.lines:[{account:r.account,sub:r.sub,amount:r.amount}]; lns.forEach(ln=>{ if(acctNameMatches(b,ln.account,re) && ln.sub!=null && ln.sub!=='') s+=Number(ln.amount)||0; }); }); return s; }
@@ -114,13 +115,15 @@ function customerBalance(b,name){ const R=b.records||{}; const c=(R.customers||[
   (R.salesInv||[]).forEach(i=>{ if(i.customer===name) bal+=Number(i.total)||0; });
   (R.creditNotes||[]).forEach(c=>{ if(c.customer===name) bal-=Number(c.total)||0; });
   bal-=cashLineSum(b,'receipts',AR_RE,name); bal+=cashLineSum(b,'payments',AR_RE,name); bal+=jrnlNet(b,AR_RE,name);
+  bal-=whtForCustomer(b,name);
+  (R.salesInv||[]).forEach(i=>{ if(i.customer===name) bal+=lateFeeFor(b,i); });
   return bal; }
 function supplierBalance(b,name){ const R=b.records||{}; const s=(R.suppliers||[]).find(x=>x.name===name); let bal=s?Number(s.balance)||0:0;
   (R.purchInv||[]).forEach(i=>{ if(i.supplier===name) bal+=Number(i.total)||0; });
   (R.debitNotes||[]).forEach(d=>{ if(d.supplier===name) bal-=Number(d.total)||0; });
   bal-=cashLineSum(b,'payments',AP_RE,name); bal+=cashLineSum(b,'receipts',AP_RE,name); bal-=jrnlNet(b,AP_RE,name);
   return bal; }
-function arMovement(b){ const R=b.records||{}; let m=0; (R.salesInv||[]).forEach(i=>{ m+=Number(i.total)||0; }); (R.creditNotes||[]).forEach(c=>{ m-=Number(c.total)||0; }); m-=cashLineSumSub(b,'receipts',AR_RE); m+=cashLineSumSub(b,'payments',AR_RE); m+=jrnlNetSub(b,AR_RE); return m; }
+function arMovement(b){ const R=b.records||{}; let m=0; (R.salesInv||[]).forEach(i=>{ m+=Number(i.total)||0; }); (R.creditNotes||[]).forEach(c=>{ m-=Number(c.total)||0; }); m-=cashLineSumSub(b,'receipts',AR_RE); m+=cashLineSumSub(b,'payments',AR_RE); m+=jrnlNetSub(b,AR_RE); m-=whtTotal(b); m+=lateFeesTotal(b); return m; }
 function apMovement(b){ const R=b.records||{}; let m=0; (R.purchInv||[]).forEach(i=>{ m+=Number(i.total)||0; }); (R.debitNotes||[]).forEach(d=>{ m-=Number(d.total)||0; }); m-=cashLineSumSub(b,'payments',AP_RE); m+=cashLineSumSub(b,'receipts',AP_RE); m-=jrnlNetSub(b,AP_RE); return m; }
 function accountMovements(b){ normalizeLineSubs(b); const mov={}; const R=b.records||{};
   const add=(id,v)=>{ if(!id||!v) return; mov[id]=(mov[id]||0)+v; };
@@ -163,6 +166,41 @@ function accountMovements(b){ normalizeLineSubs(b); const mov={}; const R=b.reco
   if(invOnHand||invCost){ let opening=0; (R.inventory||[]).forEach(it=>{ opening+=(it.openingCost!=null&&it.openingCost!=='')?(Number(it.openingCost)||0):((Number(it.qty)||0)*(Number(it.purchasePrice)||0)); }); if(invOnHand&&opening) debit(invOnHand.id,opening);
     (R.inventory||[]).forEach(it=>{ const co=invItemMovements(b,it).cogs; if(!co) return; if(invCost) debit(invCost.id,co); if(invOnHand) credit(invOnHand.id,co); });
   }
+  // ----- late payment fees: charged to the customer, earned as income -----
+  { const lf=(b.lateFees||{}); if(lf.enabled && lf.account){ const acct=acctById(b,lf.account);
+      if(acct){ const t=lateFeesTotal(b); if(t) credit(acct.id,t); } } }
+  // ----- expense claims: line accounts debited, "Expense claims" liability credited -----
+  { const claims=findAcct(b,'Expense claims');
+    (R.expenseClaims||[]).forEach(c=>{ const lns=(c.lines&&c.lines.length)?c.lines:[{account:c.account,amount:c.amount}];
+      let tot=0; lns.forEach(ln=>{ const a=Number(ln.amount!=null&&ln.amount!==''?ln.amount:ln.amountNoTax)||0; if(!a) return; tot+=a;
+        if(ln.account && !acctIsARorAP(b,ln.account)){ if(acctNeedsSub(b,ln.account)&&(ln.sub==null||ln.sub==='')) return; debit(ln.account,a); } });
+      if(claims&&tot) credit(claims.id,tot); }); }
+  // ----- billable time: uninvoiced sits as an asset; write-offs go to expense -----
+  { const bt=findAcct(b,'Billable time'), btm=findAcct(b,'Billable time - movement'), btw=findAcct(b,'Billable time - write-offs');
+    (R.billableTime||[]).forEach(t=>{ const a=billableAmount(t); if(!a) return; const st=t.status||'Uninvoiced';
+      if(st==='Uninvoiced'){ if(bt) debit(bt.id,a); if(btm) credit(btm.id,a); }
+      else if(st==='Written off'){ if(btw) debit(btw.id,a); if(btm) credit(btm.id,a); } }); }
+  // ----- withholding tax receipts: asset up, receivable down (AR handled via arMovement) -----
+  { const wht=findAcct(b,'Withholding tax receivable'); if(wht){ const t=whtTotal(b); if(t) debit(wht.id,t); } }
+  // ----- inventory write-offs: inventory value out, expense in -----
+  { const invOnHand=findAcct(b,'Inventory on hand'); const dflt=findAcct(b,'Inventory write-offs');
+    (R.invWriteOffs||[]).forEach(w=>{ const v=writeOffValue(b,w); if(!v) return;
+      const tgt=(w.account&&acctById(b,w.account))?acctById(b,w.account):dflt; if(tgt) debit(tgt.id,v); }); }
+  // ----- production orders: additional (non-inventory) cost capitalised into stock -----
+  { (R.production||[]).forEach(pr=>{ const extra=Number(pr.extraCost)||0; if(!extra) return;
+      const tgt=(pr.extraAccount&&acctById(b,pr.extraAccount))?acctById(b,pr.extraAccount):findAcct(b,'Production in progress');
+      if(tgt) credit(tgt.id,extra); }); }
+  // ----- intangible assets: opening cost / accumulated amortization + amortization entries -----
+  { const iac=findAcct(b,'Intangible assets, at cost'), iaa=findAcct(b,'Intangible assets, accumulated amortization'), amx=findAcct(b,'Amortization');
+    if(iac||iaa){ let oc=0, oa=0; (R.intangibles||[]).forEach(a=>{ oc+=Number(a.cost)||0; oa+=Number(a.accumAmort)||0; });
+      if(iac&&oc) debit(iac.id,oc); if(iaa&&oa) credit(iaa.id,oa); }
+    (R.amortization||[]).forEach(e=>{ const lns=e.lines||[]; let tot=0;
+      if(lns.length) lns.forEach(ln=>{ tot+=Number((ln.amount!=null&&ln.amount!=='')?ln.amount:ln.amortExpense)||0; }); else tot=Number(e.amount)||0;
+      if(tot){ if(amx) debit(amx.id,tot); if(iaa) credit(iaa.id,tot); } }); }
+  // ----- investments: cost carried as an asset, revaluation to market through income -----
+  { const iv=findAcct(b,'Investments'), ig=findAcct(b,'Investment gains (losses)');
+    if(iv){ let oc=0; (R.investments||[]).forEach(x=>{ oc+=Number(x.cost)||0; }); if(oc) debit(iv.id,oc); }
+    if(iv&&ig){ let g=0; (R.investments||[]).forEach(x=>{ g+=investGain(b,x); }); if(g){ debit(iv.id,g); credit(ig.id,g); } } }
   { const _susp=ensureSuspense(b); if(_susp){ const _pl=suspensePlug(b); if(_pl) credit(_susp.id,_pl); } }
   return mov; }
 function glEntries(b, acctId){
@@ -272,6 +310,43 @@ function ensureFixedAssetAccounts(b){ if(!b.coa) return; const R=b.records||{};
   let expG=(b.coa||[]).find(n=>n.type==='group'&&n.plkind==='expense');
   if(!expG){ expG={id:'gExp'+rnd(),type:'group',name:'Expenses',code:'',parent:'pl',plkind:'expense'}; b.coa.push(expG); plInsertTop(b,expG.id); }
   if(!findAcct(b,'Depreciation')) b.coa.push({id:'a'+rnd(),type:'account',name:'Depreciation',code:'',parent:expG.id,balance:0}); }
+function _plGroup(b,kind,name){ const rnd=()=>Math.random().toString(36).slice(2,9);
+  let g=(b.coa||[]).find(n=>n.type==='group'&&n.plkind===kind);
+  if(!g){ g={id:'g'+kind+rnd(),type:'group',name:name||(kind==='income'?'Income':'Expenses'),code:'',parent:'pl',plkind:kind}; b.coa.push(g); plInsertTop(b,g.id); }
+  return g; }
+function _mkAcct(b,name,parent,opts){ if(findAcct(b,name)) return findAcct(b,name);
+  const n=Object.assign({id:'a'+Math.random().toString(36).slice(2,9),type:'account',name:name,code:'',parent:parent,balance:0}, opts||{});
+  b.coa.push(n); return n; }
+function ensureExpenseClaimAccounts(b){ if(!b.coa) return; const R=b.records||{};
+  if(!(R.expenseClaims&&R.expenseClaims.length)) return;
+  _mkAcct(b,'Expense claims','liabilities',{control:1}); }
+function ensureBillableTimeAccounts(b){ if(!b.coa) return; const R=b.records||{};
+  if(!(R.billableTime&&R.billableTime.length)) return;
+  _mkAcct(b,'Billable time','assets',{control:1});
+  _mkAcct(b,'Billable time - movement', _plGroup(b,'income').id);
+  _mkAcct(b,'Billable time - write-offs', _plGroup(b,'expense').id); }
+function ensureWhtAccounts(b){ if(!b.coa) return; const R=b.records||{};
+  if(!(R.whtReceipts&&R.whtReceipts.length)) return;
+  _mkAcct(b,'Withholding tax receivable','assets'); }
+function ensureIntangibleAccounts(b){ if(!b.coa) return; const R=b.records||{};
+  if(!((R.intangibles&&R.intangibles.length)||(R.amortization&&R.amortization.length))) return;
+  _mkAcct(b,'Intangible assets, at cost','assets',{control:1});
+  _mkAcct(b,'Intangible assets, accumulated amortization','assets',{control:1});
+  _mkAcct(b,'Amortization', _plGroup(b,'expense').id); }
+function ensureInvestmentAccounts(b){ if(!b.coa) return; const R=b.records||{};
+  if(!(R.investments&&R.investments.length)) return;
+  _mkAcct(b,'Investments','assets',{control:1});
+  _mkAcct(b,'Investment gains (losses)', _plGroup(b,'income').id); }
+function ensureProductionAccounts(b){ if(!b.coa) return; const R=b.records||{};
+  if(!(R.production&&R.production.length)) return;
+  _mkAcct(b,'Production in progress', _plGroup(b,'expense').id); }
+function ensureWriteOffAccounts(b){ if(!b.coa) return; const R=b.records||{};
+  if(!(R.invWriteOffs&&R.invWriteOffs.length)) return;
+  _mkAcct(b,'Inventory write-offs', _plGroup(b,'expense').id); }
+function ensureAllControls(b){ try{
+    ensureExpenseClaimAccounts(b); ensureBillableTimeAccounts(b); ensureWhtAccounts(b);
+    ensureIntangibleAccounts(b); ensureInvestmentAccounts(b); ensureProductionAccounts(b); ensureWriteOffAccounts(b);
+  }catch(e){} }
 function faDeprFor(b,asset){ const R=b.records||{}; const name=asset&&asset.name; let s=0;
   (R.depreciation||[]).forEach(d=>{ (d.lines||[]).forEach(ln=>{ if(ln.asset===name) s+=Number((ln.amount!=null&&ln.amount!=='')?ln.amount:ln.depExpense)||0; }); }); return s; }
 function faAccumDepExcl(b,asset,exclId){ const R=b.records||{}; const name=asset&&asset.name; let s=Number(asset&&asset.accumDep)||0;
@@ -287,17 +362,109 @@ function invItemMovements(b,item){ const R=b.records||{}; const name=item&&item.
   (R.payments||[]).forEach(d=>{ (d.lines||[]).forEach(ln=>{ if(ln.sub===name && acctNameMatches(b,ln.account,INV_RE)){ const val=Number(ln.amount)||0; if(val) ev.push({date:d.date,ref:d.reference,adj:val,party:d.payee,src:'payments',id:d.id}); } }); });
   (R.receipts||[]).forEach(d=>{ (d.lines||[]).forEach(ln=>{ if(ln.sub===name && acctNameMatches(b,ln.account,INV_RE)){ const val=Number(ln.amount)||0; if(val) ev.push({date:d.date,ref:d.reference,adj:-val,party:d.paidBy,src:'receipts',id:d.id}); } }); });
   (R.journal||[]).forEach(d=>{ (d.lines||[]).forEach(ln=>{ if(ln.sub===name && acctNameMatches(b,ln.account,INV_RE)){ const adj=(Number(ln.debit)||0)-(Number(ln.credit)||0); if(adj) ev.push({date:d.date,ref:d.reference,adj:adj,lbl:'Journal entry',src:'journal',id:d.id}); } }); });
+  (R.salesInv||[]).forEach(d=>{ (d.lines||[]).forEach(ln=>{ const comps=kitComponents(b,ln.item); if(!comps) return;
+    const kq=Number(ln.qty)||0; if(!kq) return;
+    comps.forEach(c=>{ if(c.item!==name) return; const q=kq*(Number(c.qty)||0); if(q)
+      ev.push({date:d.issueDate||d.date,ref:d.reference,buy:0,q:q,lbl:'Kit — '+(ln.item||''),src:'salesInv',id:d.id}); }); }); });
+  (R.invWriteOffs||[]).forEach(d=>{ (d.lines||[]).forEach(ln=>{ if(ln.item===name){ const q=Number(ln.qty)||0; if(q) ev.push({date:d.date,ref:d.reference,buy:0,q:q,lbl:'Inventory write-off',src:'invWriteOffs',id:d.id}); } }); });
+  (R.production||[]).forEach(d=>{ (d.lines||[]).forEach(ln=>{ if(ln.item===name){ const q=Number(ln.qty)||0; if(q) ev.push({date:d.date,ref:d.reference,buy:0,q:q,lbl:'Production order — materials',src:'production',id:d.id}); } });
+    if(d.item===name){ const q=Number(d.qty)||0; if(q){ const val=productionCost(b,d); ev.push({date:d.date,ref:d.reference,buy:1,q:q,val:val,lbl:'Production order — finished goods',src:'production',id:d.id}); } } });
   ev.sort((x,y)=>String(x.date||'').localeCompare(String(y.date||''))||String(x.ref||'').localeCompare(String(y.ref||'')));
   let qty=startQty, value=startVal, lastAvg=qty>0?value/qty:startCost, cogs=0;
   const rows=[{opening:1,type:'Starting balance',qin:startQty,qout:0,cin:value,cout:0,qbal:qty,cbal:value,src:'',id:null}];
   ev.forEach(e=>{ if(e.adj!=null){ value+=e.adj; if(qty>0) lastAvg=value/qty;
       rows.push({date:e.date,ref:e.ref,type:e.lbl?e.lbl:((e.adj>=0?'Cash purchase':'Cash sale')+(e.party?' — '+e.party:'')),qin:0,qout:0,cin:e.adj>0?e.adj:0,cout:e.adj<0?-e.adj:0,qbal:qty,cbal:value,src:e.src,id:e.id}); }
     else if(e.buy){ qty+=e.q; value+=e.val; if(qty>0) lastAvg=value/qty;
-      rows.push({date:e.date,ref:e.ref,type:'Purchase invoice'+(e.party?' — '+e.party:''),qin:e.q,qout:0,cin:e.val,cout:0,qbal:qty,cbal:value,src:e.src,id:e.id}); }
+      rows.push({date:e.date,ref:e.ref,type:e.lbl||('Purchase invoice'+(e.party?' — '+e.party:'')),qin:e.q,qout:0,cin:e.val,cout:0,qbal:qty,cbal:value,src:e.src,id:e.id}); }
     else { const avg=qty>0?value/qty:lastAvg; const co=e.q*avg; cogs+=co; qty-=e.q; value-=co;
-      rows.push({date:e.date,ref:e.ref,type:'Sales invoice'+(e.party?' — '+e.party:''),qin:0,qout:e.q,cin:0,cout:co,qbal:qty,cbal:value,src:e.src,id:e.id}); } });
+      rows.push({date:e.date,ref:e.ref,type:e.lbl||('Sales invoice'+(e.party?' — '+e.party:'')),qin:0,qout:e.q,cin:0,cout:co,qbal:qty,cbal:value,src:e.src,id:e.id}); } });
   const avgCost=qty>0?value/qty:lastAvg;
   return {rows,qtyOnHand:Math.round(qty*1e6)/1e6,totalValue:Math.round(value*1e6)/1e6,avgCost,cogs,startQty,startCost}; }
+/* ---------- inventory kits ---------- */
+function kitComponents(b,name){ if(!name) return null;
+  const k=((b&&b.inventoryKits)||[]).find(x=>x&&x.name===name);
+  return (k&&k.items&&k.items.length)?k.items:null; }
+function kitCostOf(b,name){ const comps=kitComponents(b,name); if(!comps) return 0;
+  return Math.round(comps.reduce((a,c)=>a+(Number(c.qty)||0)*invAvgCostByName(b,c.item),0)*100)/100; }
+
+/* ---------- late payment fees ---------- */
+function lateFeeFor(b,inv,asOf){ const cfg=(b&&b.lateFees)||{}; if(!cfg.enabled) return 0;
+  if(!inv||!inv.lateFees) return 0;                       // opt in per invoice, as Manager does
+  const due=String(inv.dueDate||'').slice(0,10); if(!due) return 0;
+  const bal=Number(inv.balanceDue!=null?inv.balanceDue:inv.total)||0; if(bal<=0.005) return 0;
+  const today=String(asOf||new Date().toISOString().slice(0,10)).slice(0,10);
+  const P=v=>{ const m=String(v||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?Date.UTC(+m[1],+m[2]-1,+m[3]):NaN; };
+  const t=P(today), dd=P(due); if(isNaN(t)||isNaN(dd)) return 0;
+  let days=Math.round((t-dd)/86400000);
+  days-=(Number(cfg.grace)||0); if(days<=0) return 0;
+  const rate=(Number(cfg.rate)||0)/100; if(!rate) return 0;
+  let fee;
+  if(cfg.period==='once') fee=bal*rate;
+  else if(cfg.period==='year') fee=bal*rate*(days/365);
+  else fee=bal*rate*(days/30);
+  return Math.round(fee*100)/100; }
+function lateFeesTotal(b,asOf){ return ((b.records&&b.records.salesInv)||[]).reduce((a,i)=>a+lateFeeFor(b,i,asOf),0); }
+
+/* ---------- expense claims ---------- */
+var EXPCLAIM_RE=/^expense claims$/i, BILLT_RE=/^billable time$/i, WHT_RE=/^withholding tax receivable$/i,
+    IAC_RE=/^intangible assets, at cost$/i, IAA_RE=/^intangible assets, accumulated amortization$/i, INVEST_RE=/^investments$/i;
+function claimTotal(rec){ const lns=(rec&&rec.lines)||[]; if(lns.length) return lns.reduce((a,ln)=>a+(Number(ln.amount!=null&&ln.amount!==''?ln.amount:ln.amountNoTax)||0),0); return Number(rec&&rec.amount)||0; }
+function claimPayerBalance(b,name){ const R=b.records||{}; let bal=0;
+  (R.expenseClaims||[]).forEach(c=>{ if((c.payer||'')===name) bal+=claimTotal(c); });
+  bal-=cashLineSum(b,'payments',EXPCLAIM_RE,name); bal+=cashLineSum(b,'receipts',EXPCLAIM_RE,name); bal-=jrnlNet(b,EXPCLAIM_RE,name);
+  return bal; }
+
+/* ---------- billable time ---------- */
+function billableAmount(rec){ if(rec&&rec.amount!=null&&rec.amount!=='') return Number(rec.amount)||0;
+  return (Number(rec&&rec.hours)||0)*(Number(rec&&rec.rate)||0); }
+function billableByStatus(b,status){ const R=b.records||{}; let s=0;
+  (R.billableTime||[]).forEach(t=>{ if((t.status||'Uninvoiced')===status) s+=billableAmount(t); }); return s; }
+function billableCustomer(b,name,status){ const R=b.records||{}; let s=0;
+  (R.billableTime||[]).forEach(t=>{ if((t.customer||'')!==name) return; if(status&&(t.status||'Uninvoiced')!==status) return; s+=billableAmount(t); }); return s; }
+
+/* ---------- withholding tax ---------- */
+function whtTotal(b){ return ((b.records&&b.records.whtReceipts)||[]).reduce((a,r)=>a+(Number(r.amount)||0),0); }
+function whtForCustomer(b,name){ return ((b.records&&b.records.whtReceipts)||[]).reduce((a,r)=>a+(((r.customer||'')===name)?(Number(r.amount)||0):0),0); }
+
+/* ---------- inventory transfers / write-offs / production ---------- */
+function lineQtyTotal(rec){ return ((rec&&rec.lines)||[]).reduce((a,ln)=>a+(Number(ln.qty)||0),0); }
+function invAvgCostByName(b,name){ const it=((b.records&&b.records.inventory)||[]).find(x=>x.name===name); if(!it) return 0;
+  const m=invItemMovements(b,it); return m.avgCost||0; }
+function _invUnitCostAt(b,name,exclude){ const it=((b.records&&b.records.inventory)||[]).find(x=>x.name===name); if(!it) return 0;
+  const startQty=Number(it.qty)||0; var _oc=it.openingCost; const startVal=(_oc!=null&&_oc!=='')?(Number(_oc)||0):(startQty*(Number(it.purchasePrice)||0));
+  let qty=startQty, val=startVal;
+  ((b.records&&b.records.purchInv)||[]).forEach(d=>{ (d.lines||[]).forEach(ln=>{ if(ln.item!==name) return; const q=Number(ln.qty)||0; if(!q) return;
+    qty+=q; val+=(ln.net!=null?Number(ln.net):q*(Number(ln.price)||0)); }); });
+  if(qty>0) return val/qty; return Number(it.purchasePrice)||0; }
+function writeOffValue(b,rec){ let v=0; ((rec&&rec.lines)||[]).forEach(ln=>{ const q=Number(ln.qty)||0; if(!q) return;
+  const unit=(ln.unitCost!=null&&ln.unitCost!=='')?Number(ln.unitCost):_invUnitCostAt(b,ln.item); v+=q*(unit||0); }); return Math.round(v*100)/100; }
+function productionCost(b,rec){ let v=Number(rec&&rec.extraCost)||0;
+  ((rec&&rec.lines)||[]).forEach(ln=>{ const q=Number(ln.qty)||0; if(!q) return;
+    const unit=(ln.unitCost!=null&&ln.unitCost!=='')?Number(ln.unitCost):_invUnitCostAt(b,ln.item); v+=q*(unit||0); });
+  return Math.round(v*100)/100; }
+function invQtyByLocation(b,loc){ const out={}; const R=b.records||{};
+  (R.invTransfers||[]).forEach(t=>{ (t.lines||[]).forEach(ln=>{ const q=Number(ln.qty)||0; if(!q||!ln.item) return;
+    if((t.toLocation||'')===loc) out[ln.item]=(out[ln.item]||0)+q;
+    if((t.fromLocation||'')===loc) out[ln.item]=(out[ln.item]||0)-q; }); });
+  return out; }
+
+/* ---------- intangible assets ---------- */
+function iaAmortFor(b,asset){ const R=b.records||{}; const name=asset&&asset.name; let s=0;
+  (R.amortization||[]).forEach(e=>{ (e.lines||[]).forEach(ln=>{ if(ln.asset===name) s+=Number((ln.amount!=null&&ln.amount!=='')?ln.amount:ln.amortExpense)||0; }); }); return s; }
+function iaAccumAmortExcl(b,asset,exclId){ const R=b.records||{}; const name=asset&&asset.name; let s=Number(asset&&asset.accumAmort)||0;
+  (R.amortization||[]).forEach(e=>{ if(exclId!=null&&e.id===exclId) return; (e.lines||[]).forEach(ln=>{ if(ln.asset===name) s+=Number((ln.amount!=null&&ln.amount!=='')?ln.amount:ln.amortExpense)||0; }); }); return s; }
+function iaAccumAmort(b,asset){ return (Number(asset&&asset.accumAmort)||0)+iaAmortFor(b,asset); }
+function iaCashAdd(b,asset){ return cashLineSum(b,'payments',IAC_RE,asset&&asset.name)-cashLineSum(b,'receipts',IAC_RE,asset&&asset.name)+jrnlNet(b,IAC_RE,asset&&asset.name); }
+function iaCost(b,asset){ return (Number(asset&&asset.cost)||0)+iaCashAdd(b,asset); }
+function iaBookValue(b,asset){ return iaCost(b,asset)-iaAccumAmort(b,asset); }
+
+/* ---------- investments ---------- */
+function investCost(b,rec){ return (Number(rec&&rec.cost)||0)
+  + cashLineSum(b,'payments',INVEST_RE,rec&&rec.name) - cashLineSum(b,'receipts',INVEST_RE,rec&&rec.name) + jrnlNet(b,INVEST_RE,rec&&rec.name); }
+function investMarketValue(rec){ if(rec&&rec.marketValue!=null&&rec.marketValue!=='') return Number(rec.marketValue)||0;
+  return (Number(rec&&rec.qty)||0)*(Number(rec&&rec.marketPrice)||0); }
+function investGain(b,rec){ const mv=investMarketValue(rec); if(!mv) return 0; return Math.round((mv-investCost(b,rec))*100)/100; }
+
 function invItemStats(b,item){ const m=invItemMovements(b,item); return {qtyOnHand:m.qtyOnHand,avgCost:m.avgCost,totalCost:m.totalValue,cogs:m.cogs,startQty:m.startQty}; }
 function invoiceCogs(b,invId){ let c=0; ((b.records&&b.records.inventory)||[]).forEach(it=>{ invItemMovements(b,it).rows.forEach(r=>{ if(r.src==='salesInv'&&r.id===invId) c+=r.cout; }); }); return c; }
 function ensureCashControl(b){ if(!b.coa) return null;
@@ -335,4 +502,4 @@ function summaryFromCoa(b){
   return {balanceSheet:bs, profitLoss:pl};
 }
 function normalizeLineSubs(b){ if(!b||b._subsNormalized) return; if(b.records){ ['receipts','payments','journal','salesInv','purchInv','creditNotes','debitNotes'].forEach(function(k){ (b.records[k]||[]).forEach(function(r){ (r.lines||[]).forEach(function(ln){ if((ln.sub==null||ln.sub==='')&&ln.subAccount!=null&&ln.subAccount!==''){ ln.sub=ln.subAccount; } }); }); }); } b._subsNormalized=1; }
-function refreshSummary(b){ if(!b.coa) return; normalizeLineSubs(b); const s=summaryFromCoa(b); b.balanceSheet=s.balanceSheet; b.profitLoss=s.profitLoss; }
+function refreshSummary(b){ if(!b.coa) return; normalizeLineSubs(b); ensureAllControls(b); const s=summaryFromCoa(b); b.balanceSheet=s.balanceSheet; b.profitLoss=s.profitLoss; }
