@@ -7,7 +7,7 @@ const DB = {
 
 /* sidebar definition: [icon, label, registerKey] */
 const SIDEBAR = [
-  ['📊','Summary',null],['🏦','Bank and Cash Accounts','bankCash'],['🧾','Receipts','receipts'],
+  ['📈','Dashboard',null],['📊','Summary',null],['🏦','Bank and Cash Accounts','bankCash'],['🧾','Receipts','receipts'],
   ['💳','Payments','payments'],['🔁','Inter Account Transfers','iat'],['☑️','Bank Reconciliations','bankRec'],
   ['🧳','Expense Claims','expenseClaims'],
   ['👤','Customers','customers'],['🗒️','Sales Quotes','salesQuotes'],['📑','Sales Orders','salesOrders'],
@@ -31,13 +31,13 @@ const SIDEBAR_FOOT = [['📈','Reports'],['⚙️','Settings']];
    selectSection(), Customize and sidebarHidden all key off. Anything not listed
    still renders, under "More", so adding a tab can't make it disappear. */
 const SIDEBAR_GROUPS = [
-  ['Overview',   ['Summary']],
+  ['Overview',   ['Dashboard','Summary']],
+  ['Banking',    ['Bank and Cash Accounts','Receipts','Payments','Inter Account Transfers',
+                  'Bank Reconciliations']],
   ['Sales',      ['Customers','Sales Quotes','Sales Orders','Sales Invoices','Credit Notes',
                   'Delivery Notes','Billable Time','Withholding Tax Receipts']],
   ['Purchases',  ['Suppliers','Purchase Quotes','Purchase Orders','Purchase Invoices',
                   'Debit Notes','Goods Receipts','Expense Claims']],
-  ['Banking',    ['Bank and Cash Accounts','Receipts','Payments','Inter Account Transfers',
-                  'Bank Reconciliations']],
   ['Inventory',  ['Inventory Items','Inventory Transfers','Inventory Write-offs',
                   'Production Orders','Non-inventory Items']],
   ['Payroll',    ['Employees','Payslips']],

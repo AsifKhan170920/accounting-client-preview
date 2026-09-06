@@ -105,7 +105,7 @@ describe('settings coverage', () => {
   test('every sidebar section maps to a register, so none falls through', () => {
     const ctx = loadApp();
     for (const [, label, key] of ctx.SIDEBAR) {
-      if (label === 'Summary') continue;
+      if (label === 'Summary' || label === 'Dashboard') continue;  // workspace homes, not registers
       assert.ok(key, `sidebar entry "${label}" has no register key`);
       assert.ok(ctx.REG[key], `sidebar entry "${label}" points at missing REG.${key}`);
     }

@@ -92,9 +92,23 @@ describe('design tokens', () => {
     assert.deepEqual([...missing], []);
   });
 
-  test('the sidebar has its own ramp, so it stays dark in both themes', () => {
-    for (const n of ['--nav-bg', '--nav-ink', '--nav-muted', '--nav-active-bg', '--nav-active-ink'])
+  test('the sidebar has its own ramp, toned separately from the cards', () => {
+    for (const n of ['--nav-bg', '--nav-ink', '--nav-ink-2', '--nav-muted', '--nav-muted-2',
+      '--nav-hover', '--nav-line', '--nav-chip', '--nav-thumb', '--nav-active-bg', '--nav-active-ink'])
       assert.ok(root.indexOf(n + ':') >= 0, `${n} missing from :root`);
+  });
+
+  test('nothing in the rail assumes a dark background any more', () => {
+    /* The rail is cream in the light theme, so a hard-coded white-on-dark wash
+       would be invisible. Every such colour must come through a --nav-* token,
+       which the dark block flips. */
+    const rail = css.slice(css.indexOf('/* ---- sidebar rail'), css.indexOf('/* ---- open business'));
+    const stray = [...rail.matchAll(/rgba\(255,\s*255,\s*255[^)]*\)/g)].map((m) => m[0]);
+    assert.deepEqual([...stray], []);
+  });
+
+  test('the rail draws an edge, now that it shares the canvas colour family', () => {
+    assert.match(css, /\.sidebar\{[^}]*border-right:1px solid var\(--nav-line\)/);
   });
 
   test('generous radii and an orange accent, per the design brief', () => {
@@ -123,8 +137,13 @@ describe('design tokens', () => {
       'the page/workspace columns do not opt out of min-height:auto');
     assert.ok(/\.ws-body\{[^}]*min-height:0/.test(css), '.ws-body does not opt out');
     assert.ok(/\.ws-main\{[^}]*overflow-y:auto/.test(css), '.ws-main is not the scroller');
-    assert.ok(/\.side-scroll\{[^}]*min-height:0[^}]*overflow-y:auto/.test(css),
-      'the sidebar nav list is not its own scroller');
+    /* The nav list does not scroll — App._fitSidebar() shrinks it to fit — but it
+       must still bound itself, or it pushes the workspace out of #app. The
+       overflow fallback keeps every link reachable on a window too short to fit. */
+    assert.ok(/\.side-scroll\{[^}]*min-height:0[^}]*overflow:hidden/.test(css),
+      'the sidebar nav list does not bound itself');
+    assert.ok(/\.sidebar\.side-overflow \.side-scroll\{overflow-y:auto\}/.test(css),
+      'there is no scroll fallback for a window shorter than the nav can go');
     assert.ok(/#app>\.page\{overflow-y:auto\}/.test(css),
       'pages outside the workspace cannot scroll');
   });
@@ -273,12 +292,35 @@ describe('dashboard', () => {
     App.curBiz = () => b;
   });
 
-  test('the Summary still carries the Balance Sheet and P&L below the cards', () => {
+  test('Summary is the statements, and only the statements', () => {
     const out = App.summaryHtml(b);
     assert.ok(out.indexOf('Balance Sheet') >= 0);
     assert.ok(out.indexOf('Profit and Loss Statement') >= 0);
-    assert.ok(out.indexOf('dash-stats') >= 0, 'dashboard missing');
-    assert.ok(out.indexOf('dash-stats') < out.indexOf('sum-grid'), 'dashboard should come first');
+    assert.ok(out.indexOf('sum-grid') >= 0);
+    assert.ok(out.indexOf('dash-stats') < 0, 'the cards belong on the Dashboard tab now');
+  });
+
+  test('the Dashboard tab carries the cards and charts', () => {
+    const out = App.dashboardPageHtml(b);
+    assert.ok(out.indexOf('dash-stats') >= 0);
+    assert.ok(out.indexOf('Financial Overview') >= 0);
+    assert.ok(out.indexOf('Recent Transactions') >= 0);
+    assert.ok(out.indexOf('Financial Health') >= 0);
+    assert.ok(out.indexOf('sum-grid') < 0, 'the statements stay on Summary');
+  });
+
+  test('Dashboard sits first in the sidebar, above Summary, and cannot be hidden', () => {
+    const overview = SIDEBAR_GROUPS.find((g) => g[0] === 'Overview')[1];
+    assert.deepEqual([...overview], ['Dashboard', 'Summary']);
+    assert.equal(SIDEBAR[0][1], 'Dashboard');
+    assert.equal(App.isHidden({ sidebarHidden: ['Dashboard'] }, 'Dashboard'), false);
+  });
+
+  test('both workspace homes route to their own view', () => {
+    App.selectSection('Dashboard');
+    assert.equal(App.wsMode, 'dashboard');
+    App.selectSection('Summary');
+    assert.equal(App.wsMode, 'summary');
   });
 });
 

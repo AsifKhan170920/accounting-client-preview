@@ -502,4 +502,157 @@ function summaryFromCoa(b){
   return {balanceSheet:bs, profitLoss:pl};
 }
 function normalizeLineSubs(b){ if(!b||b._subsNormalized) return; if(b.records){ ['receipts','payments','journal','salesInv','purchInv','creditNotes','debitNotes'].forEach(function(k){ (b.records[k]||[]).forEach(function(r){ (r.lines||[]).forEach(function(ln){ if((ln.sub==null||ln.sub==='')&&ln.subAccount!=null&&ln.subAccount!==''){ ln.sub=ln.subAccount; } }); }); }); } b._subsNormalized=1; }
-function refreshSummary(b){ if(!b.coa) return; normalizeLineSubs(b); ensureAllControls(b); const s=summaryFromCoa(b); b.balanceSheet=s.balanceSheet; b.profitLoss=s.profitLoss; }
+
+/* ================= payment ↔ invoice allocation =================
+   A receipt or payment may carry `allocations`:
+
+     [{ key:'salesInv'|'purchInv', uid:<invoice uid>, party:'ABC Ltd', amount:n }]
+
+   which links the money sitting on that document's Accounts receivable /
+   Accounts payable lines to specific invoices — the payment_allocations join
+   table, kept on the document. It is bookkeeping metadata layered on top of the
+   existing posting, never an extra posting: the double entry is still the AR/AP
+   line itself, so balances, ledgers and the trial balance are untouched.
+
+   Money on an AR/AP line that is NOT explicitly allocated keeps the old
+   oldest-first behaviour, so documents entered before allocations existed still
+   age exactly as they did. ================================================== */
+
+/** Stable identity for a record across saves. */
+function invUid(rec){ return (rec && (rec.uuid || (rec.id!=null ? 'id:'+rec.id : ''))) || ''; }
+
+var ALLOC_SIDES = {
+  cust:{ invKey:'salesInv', party:'customer', re:AR_RE, settle:'receipts', reverse:'payments',
+         notes:'creditNotes', listKey:'customers' },
+  sup: { invKey:'purchInv', party:'supplier', re:AP_RE, settle:'payments', reverse:'receipts',
+         notes:'debitNotes',  listKey:'suppliers' }
+};
+function allocSideFor(invKey){ return invKey==='purchInv' ? 'sup' : 'cust'; }
+function alloc2(n){ return Math.round((Number(n)||0)*100)/100; }
+
+/** The signed AR/AP money one cash document moves, per party. */
+function cashPartyTotals(b,doc,re,sign){
+  var out={}; var lns=(doc.lines&&doc.lines.length)?doc.lines:[{account:doc.account,sub:doc.sub,amount:doc.amount}];
+  lns.forEach(function(ln){
+    if(!acctNameMatches(b,ln.account,re)) return;
+    var nm=ln.sub; if(nm==null||nm==='') return;
+    out[nm]=(out[nm]||0)+sign*(Number(ln.amount)||0);
+  });
+  return out;
+}
+
+/** Every allocation on a document that points at this side's invoices. */
+function docAllocations(doc,invKey){
+  return ((doc&&doc.allocations)||[]).filter(function(a){ return a && a.key===invKey && (Number(a.amount)||0)!==0; });
+}
+
+/**
+ * Work out, for one side of the ledger, what has been paid against each invoice
+ * and what is left over as an unallocated credit for each party.
+ *
+ * opts.to        — as at this date (inclusive), for the ageing reports
+ * opts.skipDoc   — ignore this document's own allocations (uid), so the form
+ *                  editing it sees the invoice as it was before this payment
+ *
+ * Returns { byUid:{uid:row}, byParty:{name:{invoices:[row], credit:n}} } where a
+ * row is {invoice, party, total, allocated, implicit, paid, outstanding}.
+ */
+function settlementIndex(b,side,opts){
+  opts=opts||{};
+  var S=ALLOC_SIDES[side], R=(b&&b.records)||{}, to=opts.to||null, skip=opts.skipDoc||null;
+  /* pool  — money the user never pinned to an invoice: aged oldest-first, which
+              is how every document entered before allocations existed behaves.
+     held  — the remainder of a document the user DID allocate: they chose which
+              invoices it settles, so what is left stays an unallocated credit
+              instead of quietly closing the next invoice in line. */
+  var explicit={}, pool={}, held={};
+
+  [[S.settle,1],[S.reverse,-1]].forEach(function(pair){
+    (R[pair[0]]||[]).forEach(function(doc){
+      if(to && String(doc.date||'').slice(0,10)>to) return;
+      if(skip && invUid(doc)===skip) return;          // the document being edited
+      var totals=cashPartyTotals(b,doc,S.re,pair[1]);
+      var used={};
+      docAllocations(doc,S.invKey).forEach(function(a){
+        var amt=pair[1]*(Number(a.amount)||0);
+        explicit[a.uid]=(explicit[a.uid]||0)+amt;
+        used[a.party||'']=(used[a.party||'']||0)+amt;
+      });
+      Object.keys(totals).forEach(function(nm){
+        if(nm in used) held[nm]=(held[nm]||0)+totals[nm]-used[nm];
+        else pool[nm]=(pool[nm]||0)+totals[nm];
+      });
+      Object.keys(used).forEach(function(nm){ if(!(nm in totals)) held[nm]=(held[nm]||0)-used[nm]; });
+    });
+  });
+
+  (R[S.notes]||[]).forEach(function(n){
+    if(to && String(n.issueDate||n.date||'').slice(0,10)>to) return;
+    var nm=n[S.party]; if(nm) pool[nm]=(pool[nm]||0)+(Number(n.total)||0);
+  });
+  if(side==='cust') (R.whtReceipts||[]).forEach(function(w){
+    if(to && String(w.date||'').slice(0,10)>to) return;
+    if(w.customer) pool[w.customer]=(pool[w.customer]||0)+(Number(w.amount)||0);
+  });
+  /* an opening balance is itself owed, and settles before any invoice does */
+  (R[S.listKey]||[]).forEach(function(p){ if(p&&p.name) pool[p.name]=(pool[p.name]||0)-(Number(p.balance)||0); });
+
+  var byParty={};
+  (R[S.invKey]||[]).forEach(function(inv){
+    var d=String(inv.issueDate||inv.date||'').slice(0,10); if(to && d && d>to) return;
+    var nm=inv[S.party]||'(none)';
+    (byParty[nm]=byParty[nm]||{invoices:[],credit:0}).invoices.push(inv);
+  });
+  Object.keys(pool).forEach(function(nm){ byParty[nm]=byParty[nm]||{invoices:[],credit:0}; });
+  Object.keys(held).forEach(function(nm){ byParty[nm]=byParty[nm]||{invoices:[],credit:0}; });
+
+  var byUid={};
+  Object.keys(byParty).forEach(function(nm){
+    var list=byParty[nm].invoices.slice().sort(function(x,y){
+      return String(x.issueDate||x.date||'').localeCompare(String(y.issueDate||y.date||'')); });
+    var left=pool[nm]||0;
+    var rows=list.map(function(inv){
+      var uid=invUid(inv), tot=Number(inv.total)||0;
+      var ex=Math.max(0, Math.min(tot, explicit[uid]||0));
+      var imp=Math.max(0, Math.min(left, tot-ex)); left-=imp;
+      var row={ invoice:inv, uid:uid, party:nm, total:alloc2(tot), allocated:alloc2(ex),
+                implicit:alloc2(imp), paid:alloc2(ex+imp), outstanding:alloc2(tot-ex-imp) };
+      byUid[uid]=row; return row;
+    });
+    byParty[nm]={ invoices:rows, credit:alloc2(Math.max(0,left)+Math.max(0,held[nm]||0)) };
+  });
+  return { byUid:byUid, byParty:byParty };
+}
+
+/** The invoices a party can still be paid against, oldest first. */
+function openInvoicesFor(b,side,party,opts){
+  var ix=settlementIndex(b,side,opts);
+  var row=ix.byParty[party];
+  if(!row) return [];
+  return row.invoices.filter(function(r){ return r.outstanding>0.005; });
+}
+
+/** What one document has already allocated, as {uid:amount}. */
+function allocationsOf(doc,invKey){
+  var out={}; docAllocations(doc,invKey).forEach(function(a){ out[a.uid]=(out[a.uid]||0)+(Number(a.amount)||0); });
+  return out;
+}
+
+/**
+ * Refresh the cached balanceDue / amountPaid on every invoice from what the
+ * ledger actually says. These stay plain derived caches — every reader (status
+ * badges, dashboards, late fees) keeps working unchanged, and nothing edits an
+ * invoice balance by hand.
+ */
+function syncInvoiceBalances(b){
+  if(!b||!b.records) return;
+  ['cust','sup'].forEach(function(side){
+    var S=ALLOC_SIDES[side], ix=settlementIndex(b,side);
+    (b.records[S.invKey]||[]).forEach(function(inv){
+      var row=ix.byUid[invUid(inv)]; if(!row) return;
+      inv.amountPaid=row.paid; inv.balanceDue=row.outstanding;
+    });
+  });
+}
+
+function refreshSummary(b){ if(!b.coa) return; normalizeLineSubs(b); syncInvoiceBalances(b); ensureAllControls(b); const s=summaryFromCoa(b); b.balanceSheet=s.balanceSheet; b.profitLoss=s.profitLoss; }
