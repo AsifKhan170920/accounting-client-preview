@@ -75,7 +75,7 @@
   /* Sidebar label → icon. Anything unmapped falls back to a neutral glyph, so
      adding a tab never renders a hole. */
   var SECTION = {
-    'Summary': 'dashboard',
+    'Dashboard': 'dashboard', 'Summary': 'scale',
     'Bank and Cash Accounts': 'bank', 'Receipts': 'receipt', 'Payments': 'card',
     'Inter Account Transfers': 'transfer', 'Bank Reconciliations': 'reconcile',
     'Expense Claims': 'bag',

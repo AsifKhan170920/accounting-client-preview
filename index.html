@@ -31,14 +31,43 @@
 
 <!-- APP -->
 <div id="app" class="hide">
+  <!-- One bar for the whole app: global tabs plus, once a business is open, the
+       workspace controls that used to sit in a second row below. -->
   <div class="toolbar">
-    <span class="tb-corner left"><span class="tb-ico" data-ico="dashboard"></span></span>
-    <button class="tb-btn" id="tabBiz" onclick="App.go('businesses')"><span class="tb-ico" data-ico="briefcase"></span>Businesses</button>
-    <button class="tb-btn" id="tabUsers" onclick="App.go('users')"><span class="tb-ico" data-ico="users"></span>Users</button>
-    <button class="tb-btn" id="tabSupport" onclick="App.go('support')"><span class="tb-ico" data-ico="lifebuoy"></span>Support</button>
-    <span class="tb-static"><span class="tb-ico" data-ico="user"></span><span id="userName">Administrator</span></span>
-    <button class="tb-btn" onclick="App.logout()"><span class="tb-ico" data-ico="logout"></span>Logout</button>
-    <span class="tb-corner right" title="Toggle light / dark theme" style="cursor:pointer" onclick="App.toggleTheme()" data-ico="moon"></span>
+    <div class="tb-left">
+      <button class="hd-icon nav-toggle" id="navToggle" title="Menu" aria-label="Open navigation"
+        aria-expanded="false" onclick="App.toggleNav()"></button>
+      <span class="tb-ico tb-home" data-ico="dashboard"></span>
+      <div class="tb-ws hide" id="tbWsHead">
+        <span class="ws-close" title="Close business" onclick="App.closeBusiness()"></span>
+        <span class="ws-biz-name" id="wsBizName"></span>
+        <a onclick="App.renameBusiness()">Rename</a>
+      </div>
+    </div>
+    <div class="tb-nav">
+      <button class="tb-btn" id="tabBiz" onclick="App.go('businesses')"><span class="tb-ico" data-ico="briefcase"></span>Businesses</button>
+      <button class="tb-btn" id="tabUsers" onclick="App.go('users')"><span class="tb-ico" data-ico="users"></span>Users</button>
+      <button class="tb-btn" id="tabSupport" onclick="App.go('support')"><span class="tb-ico" data-ico="lifebuoy"></span>Support</button>
+      <button class="tb-btn" onclick="App.logout()"><span class="tb-ico" data-ico="logout"></span>Logout</button>
+    </div>
+    <div class="tb-right">
+      <div class="tb-ws hide" id="tbWsTools">
+        <div class="hd-search">
+          <input id="wsSearch" type="search" placeholder="Search…" aria-label="Search this business"
+            oninput="App.globalSearch(this.value)" onkeydown="if(event.key==='Escape'){this.value='';App.globalSearch('')}">
+        </div>
+        <button class="hd-icon" id="hdNotify" title="Notifications" aria-label="Notifications"
+          onclick="App.openNotifications()"></button>
+        <button class="btn btn-sm" onclick="App.openTool('emails')">Emails</button>
+        <button class="btn btn-sm" onclick="App.openTool('history')">History</button>
+        <button class="btn btn-sm" onclick="App.openTool('backup')">Backup</button>
+        <div class="hd-user"><span class="hd-avatar" id="hdAvatar">A</span>
+          <span class="hd-user-txt"><span class="hd-user-name" id="hdUserName">Administrator</span>
+          <span class="hd-user-role" id="hdUserRole">Administrator</span></span></div>
+      </div>
+      <button class="hd-icon" title="Toggle light / dark theme" aria-label="Toggle light / dark theme"
+        onclick="App.toggleTheme()" id="hdTheme"></button>
+    </div>
   </div>
 
   <div id="pageBusinesses" class="page">
@@ -108,31 +137,6 @@
   </div>
 
   <div id="pageWorkspace" class="hide" style="flex:1;display:flex;flex-direction:column">
-    <div class="ws-head">
-      <div class="ws-head-left">
-        <button class="hd-icon nav-toggle" id="navToggle" title="Menu" aria-label="Open navigation"
-          aria-expanded="false" onclick="App.toggleNav()"></button>
-        <span class="ws-close" title="Close business" onclick="App.closeBusiness()"></span>
-        <span class="ws-biz-name" id="wsBizName"></span>
-        <a onclick="App.renameBusiness()">Rename</a>
-      </div>
-      <div class="ws-head-right">
-        <div class="hd-search">
-          <input id="wsSearch" type="search" placeholder="Search…" aria-label="Search this business"
-            oninput="App.globalSearch(this.value)" onkeydown="if(event.key==='Escape'){this.value='';App.globalSearch('')}">
-        </div>
-        <button class="hd-icon" id="hdNotify" title="Notifications" aria-label="Notifications"
-          onclick="App.openNotifications()"></button>
-        <button class="hd-icon" title="Toggle light / dark theme" aria-label="Toggle light / dark theme"
-          onclick="App.toggleTheme()" id="hdTheme"></button>
-        <button class="btn btn-sm" onclick="App.openTool('emails')">Emails</button>
-        <button class="btn btn-sm" onclick="App.openTool('history')">History</button>
-        <button class="btn btn-sm" onclick="App.openTool('backup')">Backup</button>
-        <div class="hd-user"><span class="hd-avatar" id="hdAvatar">A</span>
-          <span class="hd-user-txt"><span class="hd-user-name" id="hdUserName">Administrator</span>
-          <span class="hd-user-role" id="hdUserRole">Administrator</span></span></div>
-      </div>
-    </div>
     <div class="ws-body">
       <div class="side-scrim" onclick="App.closeNav()"></div>
       <aside class="sidebar" id="sidebar"></aside>
@@ -191,5 +195,9 @@
 <link rel="stylesheet" href="dist/invoice-designer/invoice-designer.css">
 <script src="dist/invoice-designer/invoice-designer.js"></script>
 <script src="js/invoice-designer-bridge.js"></script>
+<script src="js/quick-create.js"></script>
+<script src="js/allocations.js"></script>
+<script src="js/party-balance.js"></script>
+<script src="js/enter-nav.js"></script>
 </body>
 </html>

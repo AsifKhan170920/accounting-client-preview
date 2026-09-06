@@ -21,12 +21,17 @@ have now been split into proper, separately‑maintainable source files.
 │   │                              #   row, one REG entry and one STARTERS entry in the form editors
 │   │                              #   SIDEBAR_GROUPS controls how the rail groups them (display only)
 │   ├── accounting.js              # Demo seed data + accounting engine (balances, ledgers, COA, movements)
+│   │                              #   plus settlementIndex(): payment/invoice allocation and balances
 │   ├── app.js                     # App controller: auth, pages, registers, forms, reports, settings
 │   ├── designer.js                # Voucher / invoice template designer + app bootstrap (App.init)
+│   ├── allocations.js             # Receipt/Payment panel applying money to a party's open invoices
+│   ├── party-balance.js           # The selected customer/supplier's balance, beside Paid by / Paid to
+│   ├── enter-nav.js               # ENTER behaves like TAB in form fields (one document keydown listener)
 │   ├── form-editor-bridge.js      # Glue between the app and the embedded form editor (postMessage bridge)
 │   ├── form-editor-embedded.js    # The form editor as embedded in index.html
 │   ├── form-editor.js             # The form editor as used by the standalone form-html-editor.html
-│   └── invoice-designer-bridge.js # Canva-style invoice designer integration (React + Fabric.js module)
+│   ├── invoice-designer-bridge.js # Canva-style invoice designer integration (React + Fabric.js module)
+│   └── quick-create.js            # "＋ Add New …" on entity dropdowns: dialog, validation, searchable panel
 ├── invoice-designer/              # React + TypeScript + Fabric.js invoice designer (source)
 │   └── src/ …                     # Build with: cd invoice-designer && npm install && npm run build
 ├── dist/invoice-designer/         # Built IIFE bundle loaded by index.html
@@ -40,6 +45,10 @@ have now been split into proper, separately‑maintainable source files.
 │   ├── settings.test.mjs          # Settings screens + the behaviour they drive
 │   ├── ui.test.mjs                # Design tokens, icon coverage, nav groups, dashboard maths
 │   ├── email.test.mjs             # Templates, mailto building, send validation, log
+│   ├── allocations.test.mjs       # Payment/invoice allocation: partial, full, multi, unallocated, ageing
+│   ├── partybalance.test.mjs      # Party balance badge: right ledger per party type, right wording
+│   ├── enternav.test.mjs          # ENTER-as-TAB decision table (fields, textareas, dropdowns, buttons)
+│   ├── quickcreate.test.mjs       # "＋ Add New" entity registry, validation and shared creation logic
 │   ├── sidebar.test.mjs           # Customize (per-business section visibility)
 │   └── support.test.mjs           # Diagnostics + settings-coverage guard
 ├── scripts/check-dist.mjs         # Fails if dist/ has drifted from invoice-designer/src

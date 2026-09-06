@@ -5,6 +5,8 @@ const App = {
   /* ---------- bootstrap ---------- */
   init(){
     try{ if(localStorage.getItem('mgr_theme')==='dark') document.body.classList.add('theme-dark'); }catch(e){}
+    /* the nav re-fits itself when the window height changes */
+    try{ let t=0; window.addEventListener('resize',()=>{ clearTimeout(t); t=setTimeout(()=>App._fitSidebar(),120); }); }catch(e){}
     let accts=DB.get(DB.k.accounts,null);
     if(!accts){ accts=[{name:'Administrator',user:'Administrator',pass:'admin'}]; DB.set(DB.k.accounts,accts); }
     if(!DB.get(DB.k.users,null)) DB.set(DB.k.users,[{id:1,name:'Administrator',user:'Administrator',role:'Administrator'}]);
@@ -70,7 +72,7 @@ const App = {
   enterApp(){
     document.getElementById('auth').classList.add('hide'); document.getElementById('app').classList.remove('hide');
     const s=this.current||DB.get(DB.k.session,{name:'User'});
-    document.getElementById('userName').textContent=s.name;
+    { const el=document.getElementById('userName'); if(el) el.textContent=s.name; }
     this.go('businesses');
   },
 
@@ -89,6 +91,9 @@ const App = {
     else if(view==='support'){ document.getElementById('pageSupport').classList.remove('hide'); this.renderSupport(); }
     else if(view==='workspace'){ document.getElementById('pageWorkspace').classList.remove('hide'); this.renderWorkspace(); }
     document.getElementById('addMenu').classList.add('hide');
+    /* the workspace half of the single toolbar only applies inside a business */
+    document.querySelectorAll('.tb-ws').forEach(el=>el.classList.toggle('hide', view!=='workspace'));
+    this._paintChrome(view==='workspace'?this.curBiz():null);
   },
 
   /* ---------- support ---------- */
@@ -260,7 +265,8 @@ const App = {
   renameBusiness(){ const b=this.curBiz(); if(!b) return; const n=prompt('Rename business',b.name); if(n===null) return; b.name=n.trim()||b.name; this.saveBiz(b); this.renderWorkspace(); },
 
   selectSection(label){ this.closeNav(); this.navTrail=[]; this.pageNum=1; this.batchMode=false; this.batchSel=null; this.advFilters=null; this.histReturn=false; this.wsSection=label; this.listQuery=''; this.editingId=null; this.setView=null; this.repView=null; this.ledgerId=null;
-    this.wsMode = label==='Summary' ? 'summary' : (LABEL2KEY[label] ? 'list' : (label==='Settings' ? 'settings' : (label==='Reports' ? 'reports' : 'section'))); this.renderWorkspace(); },
+    this.wsMode = label==='Summary' ? 'summary' : (label==='Dashboard' ? 'dashboard' :
+      (LABEL2KEY[label] ? 'list' : (label==='Settings' ? 'settings' : (label==='Reports' ? 'reports' : 'section')))); this.renderWorkspace(); },
 
   renderWorkspace(){
     const b=this.curBiz(); if(!b){ this.go('businesses'); return; }
@@ -271,7 +277,7 @@ const App = {
   /* Hidden sections are stored per business as an array of SIDEBAR labels.
      'Summary' is never hideable — it is the workspace home. */
   hiddenSections(b){ return (b&&b.sidebarHidden)||[]; },
-  isHidden(b,label){ if(label==='Summary') return false;
+  isHidden(b,label){ if(label==='Summary'||label==='Dashboard') return false;
     if(this.hiddenSections(b).indexOf(label)>=0) return true;
     var p=this.myPermissions(b);
     return !!(p && p.role==='Restricted' && (p.hidden||[]).indexOf(label)>=0); },
@@ -300,15 +306,9 @@ const App = {
         icoHtml+'<span class="side-label">'+esc(label)+'</span>'+badge+'</div>';
     };
 
-    /* brand + create-new */
-    const initials=(b.name||'?').trim().slice(0,1).toUpperCase();
-    let html='<div class="side-brand"><span class="side-mark">'+esc(initials)+'</span>'+
-      '<span class="side-brand-txt"><span class="side-brand-name">'+esc(b.name||'Business')+'</span>'+
-      '<span class="side-brand-sub">'+esc(b.country||'Accounting')+'</span></span></div>'+
-      '<div class="side-create-wrap"><button class="side-create" onclick="App.toggleCreateMenu(event)"'+
-      ' aria-haspopup="true" aria-expanded="'+(this._createOpen?'true':'false')+'">'+
-      I('plus',17)+'Create New</button>'+
-      (this._createOpen?this._createMenuHtml(b):'')+'</div><div class="side-scroll">';
+    /* The rail is nav only: the business name moved to the toolbar and Create New
+       is gone, so the list starts at the very top of the sidebar. */
+    let html='<div class="side-scroll">';
 
     /* grouped sections; anything a group forgot still shows, under "More" */
     const groups=(typeof SIDEBAR_GROUPS!=='undefined')?SIDEBAR_GROUPS:[['',SIDEBAR.map(x=>x[1])]];
@@ -336,22 +336,33 @@ const App = {
       (nHid?'<span class="side-cust-n">'+nHid+' hidden</span>':'')+'</div>';
     html+='</div>';
 
-    /* pinned footer */
-    const s=this.current||DB.get(DB.k.session,{name:'User'});
-    const uname=(s&&(s.name||s.user))||'User';
+    /* Pinned footer. Neither Settings nor the profile card is repeated here:
+       SIDEBAR_FOOT renders Settings just above, and the toolbar already carries
+       the signed-in user and Logout. */
     html+='<div class="side-foot">'+
-      '<div class="side-item" role="button" tabindex="0" onclick="App.selectSection(\'Settings\')"'+
-        ' onkeydown="if(event.key===\'Enter\'){this.click()}">'+I('settings',18)+'<span class="side-label">Settings</span></div>'+
       '<div class="side-item" role="button" tabindex="0" onclick="App.go(\'support\')"'+
         ' onkeydown="if(event.key===\'Enter\'){this.click()}">'+I('lifebuoy',18)+'<span class="side-label">Help &amp; Support</span></div>'+
-      '<div class="side-user"><span class="side-avatar">'+esc(uname.trim().slice(0,1).toUpperCase())+'</span>'+
-        '<span class="side-user-txt"><span class="side-user-name">'+esc(uname)+'</span>'+
-        '<span class="side-user-role">'+esc((s&&s.role)||'Administrator')+'</span></span>'+
-        '<button class="side-logout" title="Log out" aria-label="Log out" onclick="App.logout()">'+I('logout',17)+'</button></div>'+
       '</div>';
 
     document.getElementById('sidebar').innerHTML=html;
     this._paintChrome(b);
+    this._fitSidebar();
+  },
+  /* Size the nav to the space it has instead of scrolling it. --sf runs from 1
+     (roomy) down to 0 (tightest readable); we binary-search the largest value
+     whose content still fits, so a tall window stays airy and a short one closes
+     up. Nothing is ever hidden: if even 0 overflows the rail scrolls again. */
+  _fitSidebar(){
+    const sb=document.getElementById('sidebar'); if(!sb) return;
+    const box=sb.querySelector('.side-scroll'); if(!box) return;
+    const fits=v=>{ sb.style.setProperty('--sf',v); return box.scrollHeight<=box.clientHeight+1; };
+    sb.classList.remove('side-overflow');
+    if(fits(1)) return;
+    let lo=0, hi=1, best=null;
+    for(let i=0;i<8;i++){ const mid=(lo+hi)/2; if(fits(mid)){ best=mid; lo=mid; } else hi=mid; }
+    if(best!=null){ sb.style.setProperty('--sf',best); return; }
+    sb.style.setProperty('--sf',0);
+    sb.classList.add('side-overflow');           // shorter than the nav can go
   },
   /* Header chrome that lives outside #sidebar but changes with it. */
   _paintChrome(b){
@@ -368,7 +379,7 @@ const App = {
     const uname=(s&&(s.name||s.user))||'User';
     const av=document.getElementById('hdAvatar'); if(av) av.textContent=uname.trim().slice(0,1).toUpperCase();
     const un=document.getElementById('hdUserName'); if(un) un.textContent=uname;
-    const ur=document.getElementById('hdUserRole'); if(ur) ur.textContent=(b&&b.name)||(s&&s.role)||'Administrator';
+    const ur=document.getElementById('hdUserRole'); if(ur) ur.textContent=(s&&s.role)||'Administrator';
     try{ const dot=document.getElementById('hdDot'); if(dot){ const n=this.notificationCount(b); dot.hidden=!n; } }catch(e){}
   },
   /* ---- create-new menu ---- */
@@ -486,6 +497,7 @@ const App = {
   customizeCancel(){ this._custDraft=null; this.wsMode='summary'; this.wsSection='Summary'; this.renderWorkspace(); },
   renderMain(b){
     const m=document.getElementById('wsMain');
+    if(this.wsMode==='dashboard'){ m.innerHTML=this.dashboardPageHtml(b); return; }
     if(this.wsMode==='summary'){ m.innerHTML=this.summaryHtml(b); return; }
     if(this.wsMode==='summaryEdit'){ m.innerHTML=this.periodFormHtml(b); return; }
     /* Safety net: every SIDEBAR entry maps to a register, so this only renders
@@ -494,7 +506,7 @@ const App = {
       '<div class="empty" style="margin-top:30px"><div class="big">'+this.esc(this.wsSection)+'</div>'+
       'This section has no register configured. Add an entry for it to <code>REG</code> in <code>js/data.js</code>.</div>'; return; }
     if(this.wsMode==='list'){ m.innerHTML=this.listHtml(b); return; }
-    if(this.wsMode==='form'){ const _k=LABEL2KEY[this.wsSection]; m.innerHTML=this.formHtml(b); var _self=this; setTimeout(function(){ _self._mountDesignedForm(_k); },0); return; }
+    if(this.wsMode==='form'){ const _k=LABEL2KEY[this.wsSection]; m.innerHTML=this.formHtml(b); var _self=this; setTimeout(function(){ _self._mountDesignedForm(_k); try{ QuickCreate.scan(m); }catch(e){} },0); return; }
     if(this.wsMode==='view'){ m.innerHTML=this.viewHtml(b); return; }
     if(this.wsMode==='ledger'){ m.innerHTML=this.ledgerHtml(b); return; }
     if(this.wsMode==='glledger'){ m.innerHTML=this.glLedgerHtml(b); return; }
@@ -560,7 +572,7 @@ const App = {
           const raw=col.calc?col.calc(r):r[col.key];
           if(col.kind==='money'){ const inner=col.ledger?'<a class="led-link" onclick="App.openLedger('+r.id+')">'+this.money(raw)+'</a>':this.money(raw); return '<td class="m '+(col.r?'r ':'')+(col.color||'')+' '+(col.bold?'bold':'')+'">'+inner+'</td>'; }
           if(col.kind==='date') return '<td class="'+(col.r?'r':'')+'">'+this.fmtDateUS(raw)+'</td>';
-          if(col.kind==='status'){ const s=raw||''; const cls=s==='Overdue'?'st-overdue':(s==='Paid'?'st-paid':(s==='Draft'?'st-draft':'st-unpaid')); return '<td>'+(s?'<span class="st-badge '+cls+'">'+this.esc(s)+'</span>':'')+'</td>'; }
+          if(col.kind==='status'){ const s=raw||''; const cls=s==='Overdue'?'st-overdue':(s==='Paid'?'st-paid':(s==='Draft'?'st-draft':(s==='Partially paid'?'st-partial':'st-unpaid'))); return '<td>'+(s?'<span class="st-badge '+cls+'">'+this.esc(s)+'</span>':'')+'</td>'; }
           return '<td class="'+(col.r?'r':'')+'">'+(col.ledger?'<a class="led-link" onclick="App.openLedger('+r.id+')">'+this.esc(raw==null?'':raw)+'</a>':this.esc(raw==null?'':raw))+'</td>';
         }).join('')+'</tr>').join('');
     }
@@ -725,14 +737,14 @@ const App = {
     var TXN=this._divisionTxnKeys();
     if(!TXN[key]) return ''; var cur=(rec&&rec.division)||'';
     var opts='<option value="">— No division —</option>'+divs.map(function(d){ return '<option value="'+self.esc(d.id)+'"'+(cur===d.id?' selected':'')+'>'+self.esc(d.name||'')+(d.code?(' ('+self.esc(d.code)+')'):'')+'</option>'; }).join('');
-    return '<div class="div-bar"><label>Division</label><select id="f_division">'+opts+'</select>'+
+    return '<div class="div-bar"><label>Division</label><select id="f_division" data-qc-source="division">'+opts+'</select>'+
       this._projectPicker(b,key,rec)+'<span class="div-hint">Tag this transaction to a division / department.</span></div>'; },
   _divisionTxnKeys(){ return {receipts:1,payments:1,iat:1,salesInv:1,purchInv:1,salesQuotes:1,purchQuotes:1,salesOrders:1,purchOrders:1,
     creditNotes:1,debitNotes:1,deliveryNotes:1,goodsRec:1,journal:1,payslips:1,depreciation:1,
     expenseClaims:1,billableTime:1,whtReceipts:1,invWriteOffs:1,production:1,amortization:1}; },
   _projectPicker(b,key,rec){ var self=this; var ps=(b.projects||[]).filter(function(p){ return p&&p.name&&p.status!=='Complete'; });
     if(!ps.length) return ''; var cur=(rec&&rec.project)||'';
-    return '<label style="margin-left:14px">Project</label><select id="f_project"><option value="">— No project —</option>'+
+    return '<label style="margin-left:14px">Project</label><select id="f_project" data-qc-source="project"><option value="">— No project —</option>'+
       ps.map(function(p){ return '<option value="'+self.esc(p.id)+'"'+(cur===p.id?' selected':'')+'>'+self.esc(p.name)+(p.code?(' ('+self.esc(p.code)+')'):'')+'</option>'; }).join('')+'</select>'; },
 
   /* Values a new document opens with, from Settings -> Form Defaults. */
@@ -971,8 +983,16 @@ const App = {
     if(/^inventory on hand$/i.test(nm)) return 'inventory'; if(/^fixed assets, at cost$/i.test(nm)) return 'fixedAssets'; return null; },
   cashAcctChange(i,val){ const ln=this._lines[i]; ln.account=val; ln.sub=''; this.refreshLines(); },
   invCostOfSales(r){ return invoiceCogs(this.curBiz(), r.id); },
-  invStatus(r){ if(r.statusOverride) return r.statusOverride; const bal=Number(r.balanceDue!=null?r.balanceDue:r.total)||0;
-    if(bal<=0.005) return 'Paid'; if(r.dueDate){ const due=new Date(r.dueDate); const today=new Date(); today.setHours(0,0,0,0); if(due<today) return 'Overdue'; } return 'Unpaid'; },
+  /* balanceDue is kept up to date by syncInvoiceBalances() from the payments and
+     allocations actually posted, so the badge follows the ledger. Overdue still
+     wins over Partially paid — being past due is a fact about the date, and the
+     ageing reports read this status. */
+  invStatus(r){ if(r.statusOverride) return r.statusOverride;
+    const tot=Number(r.total)||0; const bal=Number(r.balanceDue!=null?r.balanceDue:tot)||0;
+    if(bal<=0.005) return 'Paid';
+    if(r.dueDate){ const due=new Date(r.dueDate); const today=new Date(); today.setHours(0,0,0,0); if(due<today) return 'Overdue'; }
+    if(tot>0.005 && bal<tot-0.005) return 'Partially paid';
+    return 'Unpaid'; },
   toggleInvInc(v){ this._invInc=!!v; this.recomputeLines(); },
   toggleDescCol(v){ this._showDesc=!!v; this.refreshLines(); },
   toggleLineNum(v){ this._showLineNum=!!v; this.refreshLines(); },
@@ -1142,25 +1162,60 @@ const App = {
     if(this.editingId!=null){ const i=arr.findIndex(r=>r.id===this.editingId); if(i>=0) arr[i]={...arr[i],...data}; }
     else { data.id=Date.now()+Math.floor(Math.random()*1000); data.uuid=this.uuid(); arr.push(data); }
     const key=LABEL2KEY[this.wsSection];
-    if(b.coa){
-      if(key==='salesInv'){ ensureControl(b,'Accounts receivable','assets'); ensureControl(b,'Output VAT','liabilities'); }
-      else if(key==='purchInv'){ ensureControl(b,'Accounts payable','liabilities'); ensureControl(b,'Input VAT','liabilities'); }
-      else if(key==='creditNotes'){ ensureControl(b,'Accounts receivable','assets'); ensureControl(b,'Output VAT','liabilities'); }
-      else if(key==='debitNotes'){ ensureControl(b,'Accounts payable','liabilities'); ensureControl(b,'Input VAT','liabilities'); }
-      if(key==='bankCash') ensureCashControl(b);
-      if(key==='receipts'||key==='payments'||key==='iat') ensureCashControl(b);
-      if(key==='receipts' && data.customer) ensureControl(b,'Accounts receivable','assets');
-      if(key==='payments' && data.supplier) ensureControl(b,'Accounts payable','liabilities');
-      if(key==='payslips' || (key==='payments' && data.employee)) ensureControl(b,'Employee clearing account','liabilities');
-      if(key==='customers') ensureControl(b,'Accounts receivable','assets');
-      if(key==='suppliers') ensureControl(b,'Accounts payable','liabilities');
-      if(key==='employees') ensureControl(b,'Employee clearing account','liabilities');
-      if(key==='capital') ensureCapitalControl(b);
-      if(key==='salesInv'||key==='purchInv'||key==='inventory') ensureInventoryAccounts(b);
-      if(key==='fixedAssets'||key==='depreciation') ensureFixedAssetAccounts(b);
-      if(key==='capital' || ((key==='receipts'||key==='payments') && data.capitalAcc)) ensureCapitalControl(b);
-    }
+    this.ensureControlsFor(b,key,data);
     this.setRecords(b,arr); refreshSummary(b); this.saveBiz(b); if(!this.backFromRecord()) this.backToList();
+  },
+  /* The control accounts a saved record of this kind needs to exist. Shared by
+     the full-page register form and the quick-create dialog, so both paths
+     create exactly the same chart-of-accounts entries. */
+  ensureControlsFor(b,key,data){
+    data=data||{};
+    if(!b||!b.coa) return;
+    if(key==='salesInv'){ ensureControl(b,'Accounts receivable','assets'); ensureControl(b,'Output VAT','liabilities'); }
+    else if(key==='purchInv'){ ensureControl(b,'Accounts payable','liabilities'); ensureControl(b,'Input VAT','liabilities'); }
+    else if(key==='creditNotes'){ ensureControl(b,'Accounts receivable','assets'); ensureControl(b,'Output VAT','liabilities'); }
+    else if(key==='debitNotes'){ ensureControl(b,'Accounts payable','liabilities'); ensureControl(b,'Input VAT','liabilities'); }
+    if(key==='bankCash') ensureCashControl(b);
+    if(key==='receipts'||key==='payments'||key==='iat') ensureCashControl(b);
+    if(key==='receipts' && data.customer) ensureControl(b,'Accounts receivable','assets');
+    if(key==='payments' && data.supplier) ensureControl(b,'Accounts payable','liabilities');
+    if(key==='payslips' || (key==='payments' && data.employee)) ensureControl(b,'Employee clearing account','liabilities');
+    if(key==='customers') ensureControl(b,'Accounts receivable','assets');
+    if(key==='suppliers') ensureControl(b,'Accounts payable','liabilities');
+    if(key==='employees') ensureControl(b,'Employee clearing account','liabilities');
+    if(key==='capital') ensureCapitalControl(b);
+    if(key==='salesInv'||key==='purchInv'||key==='inventory') ensureInventoryAccounts(b);
+    if(key==='fixedAssets'||key==='depreciation') ensureFixedAssetAccounts(b);
+    if(key==='capital' || ((key==='receipts'||key==='payments') && data.capitalAcc)) ensureCapitalControl(b);
+  },
+  /* Create one register record without a DOM, using REG[key].form as the schema
+     and the same required-field rule the full-page form applies. Returns
+     {ok:true, record} or {ok:false, error} — the caller decides how to show it. */
+  createEntityRecord(key,data){
+    const b=this.curBiz(); if(!b) return {ok:false,error:'No business is open.'};
+    if(this.isReadOnly(b)) return {ok:false,error:'Your access to this business is read only.'};
+    const c=REG[key]; if(!c) return {ok:false,error:'Unknown record type.'};
+    const rec={};
+    for(const f of (c.form||[])){
+      let v=data[f.key];
+      if(f.type==='check') v=!!v;
+      else if(f.type==='money'||f.type==='number') v=(v===''||v==null)?'':this.parseNum(v);
+      else v=(v==null)?'':String(v).trim();
+      if(f.req && (v===''||v==null)) return {ok:false,error:f.label+' is required.',field:f.key};
+      rec[f.key]=v;
+    }
+    const name=String(rec.name||'').trim();
+    if(name){
+      const dup=((b.records&&b.records[key])||[]).some(r=>String(r.name||'').trim().toLowerCase()===name.toLowerCase());
+      if(dup) return {ok:false,error:'A '+String(c.singular||'record').toLowerCase()+' named \u201c'+name+'\u201d already exists.',field:'name'};
+    }
+    rec.id=Date.now()+Math.floor(Math.random()*1000); rec.uuid=this.uuid();
+    b.records=b.records||{}; const arr=(b.records[key]||[]).slice(); arr.push(rec); b.records[key]=arr;
+    this.ensureControlsFor(b,key,rec);
+    try{ refreshSummary(b); }catch(e){}
+    try{ this._logActivity(b,'create',key,rec,null); }catch(e){}
+    this.saveBiz(b);
+    return {ok:true,record:rec};
   },
   deleteRecord(id){ if(!this.guardWrite()) return; const b=this.curBiz(), c=this.cfg(); var _r=(this.records(b)||[]).find(function(r){return r.id===id;}); var _lk=(b&&b.lockDate)||''; if(_lk&&_r){ var _d=String(_r.issueDate||_r.date||'').slice(0,10); if(_d&&_d<=_lk){ alert('This entry is dated on or before the lock date ('+_lk+') and can\u2019t be deleted while the period is locked. Update Settings \u2192 Lock Date first.'); return; } } if(!confirm('Delete this '+c.singular.toLowerCase()+'?')) return;
     var _key=this._sectionKey(); var _bef=(this.records(b)||[]).find(function(r){return r.id===id;}); _bef=_bef?JSON.parse(JSON.stringify(_bef)):null;
@@ -1427,6 +1482,7 @@ const App = {
 
   /* ----- customer / supplier ledger ----- */
   _navLabel(){ const b=this.curBiz();
+    if(this.wsMode==='dashboard') return 'Dashboard';
     if(this.wsMode==='summary') return 'Summary';
     if(this.wsMode==='glledger'){ const a=acctById(b,this.glAcctId); return a?(a.name||'Account'):'Account'; }
     if(this.wsMode==='ledger'){ const rec=(this.records(b)||[]).find(r=>r.id===this.ledgerId); return rec?(rec.name||this.wsSection||'Ledger'):(this.wsSection||'Ledger'); }
@@ -2237,23 +2293,20 @@ const App = {
       if((isC?n.customer:n.supplier)===name) paid+=Number(n.total)||0; });
     if(isC) (R.whtReceipts||[]).forEach(function(w){ if(to && String(w.date||'').slice(0,10)>to) return; if(w.customer===name) paid+=Number(w.amount)||0; });
     return paid; },
-  /* Allocate what a party has paid against their invoices oldest-first, which is
-     what makes an ageing report meaningful when payments are not invoice-linked. */
-  _openInvoices(b,party,to){ var self=this; var R=b.records||{}; var isC=(party==='cust');
-    var key=isC?'salesInv':'purchInv'; var pk=isC?'customer':'supplier';
-    var byParty={};
-    (R[key]||[]).forEach(function(inv){ var d=String(inv.issueDate||inv.date||'').slice(0,10); if(to && d && d>to) return;
-      var nm=inv[pk]||'(none)'; (byParty[nm]=byParty[nm]||[]).push(inv); });
-    var out=[];
-    Object.keys(byParty).forEach(function(nm){
-      var list=byParty[nm].slice().sort(function(x,y){ return String(x.issueDate||x.date||'').localeCompare(String(y.issueDate||y.date||'')); });
-      var pool=self._invPaidTo(b,{customer:nm,supplier:nm},party,to);
-      var opening=((R[isC?'customers':'suppliers']||[]).find(function(x){ return x.name===nm; })||{}).balance;
-      pool-=Number(opening)||0;                                    // starting balances settle first
-      list.forEach(function(inv){ var tot=Number(inv.total)||0; var use=Math.max(0,Math.min(pool,tot)); pool-=use;
-        var due=Math.round((tot-use)*100)/100; if(Math.abs(due)<0.005) return;
-        out.push({party:nm, inv:inv, total:tot, due:due,
-          date:String(inv.issueDate||inv.date||'').slice(0,10), dueDate:String(inv.dueDate||'').slice(0,10), ref:inv.reference||''}); });
+  /* What each party still owes, invoice by invoice. Explicit payment allocations
+     are honoured first; whatever a party has paid without naming an invoice is
+     still spread oldest-first, which is what keeps an ageing report meaningful.
+     settlementIndex() is the single implementation — the allocation panel on the
+     payment form reads the same numbers, so the two cannot drift apart. */
+  _openInvoices(b,party,to){
+    var ix=settlementIndex(b,party,{to:to}); var out=[];
+    Object.keys(ix.byParty).forEach(function(nm){
+      ix.byParty[nm].invoices.forEach(function(r){
+        if(Math.abs(r.outstanding)<0.005) return;
+        out.push({party:nm, inv:r.invoice, total:r.total, due:r.outstanding,
+          date:String(r.invoice.issueDate||r.invoice.date||'').slice(0,10),
+          dueDate:String(r.invoice.dueDate||'').slice(0,10), ref:r.invoice.reference||''});
+      });
     });
     return out; },
   _ageDays(asOf,d){ if(!d) return 0; var P=function(v){ var m=String(v||'').slice(0,10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -4263,12 +4316,29 @@ const App = {
       refreshSummary(b); this.saveBiz(b); this.coaCtx=null; this.renderMain(b); return;
     }
     // account
-    let parent=(document.getElementById('coa_parent')||{}).value;
-    if(ctx.side==='pl' && !parent){ const gid='g'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);
-      b.coa.push({id:gid,type:'group',name:'Uncategorised',code:'',parent:'pl',plkind:'income'}); this.plInsert(b,gid); parent=gid; }
-    if(ctx.id){ const n=b.coa.find(x=>x.id===ctx.id); n.name=name; n.code=code; n.parent=parent; n.balance=this.parseNum(document.getElementById('coa_bal').value)||0; }
-    else { const id='a'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36); b.coa.push({id,type:'account',name,code,parent,balance:this.parseNum(document.getElementById('coa_bal').value)||0}); }
+    const bal=this.parseNum((document.getElementById('coa_bal')||{}).value)||0;
+    if(ctx.id){ const parent=this.coaResolveParent(b,ctx.side,(document.getElementById('coa_parent')||{}).value);
+      const n=b.coa.find(x=>x.id===ctx.id); n.name=name; n.code=code; n.parent=parent; n.balance=bal; }
+    else { const r=this.coaCreateAccount(b,{name,code,parent:(document.getElementById('coa_parent')||{}).value,side:ctx.side,balance:bal});
+      if(!r.ok){ alert(r.error); return; } }
     refreshSummary(b); this.saveBiz(b); this.coaCtx=null; this.renderMain(b); },
+  /* A Profit & Loss account needs a group to live in; make one if there is none. */
+  coaResolveParent(b,side,parent){
+    if(side==='pl' && !parent){ const gid='g'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);
+      b.coa.push({id:gid,type:'group',name:'Uncategorised',code:'',parent:'pl',plkind:'income'}); this.plInsert(b,gid); return gid; }
+    return parent; },
+  /* Add one account to the chart. Shared by the Chart of Accounts editor and the
+     quick-create dialog. Does not save — the caller does, so it can batch. */
+  coaCreateAccount(b,o){
+    o=o||{}; const name=String(o.name||'').trim();
+    if(!name) return {ok:false,error:'Name is required.',field:'name'};
+    if((b.coa||[]).some(n=>n.type==='account' && String(n.name||'').trim().toLowerCase()===name.toLowerCase()))
+      return {ok:false,error:'An account named \u201c'+name+'\u201d already exists.',field:'name'};
+    const parent=this.coaResolveParent(b,o.side||'bs',o.parent);
+    const id='a'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);
+    const node={id,type:'account',name,code:String(o.code||'').trim(),parent,balance:this.parseNum(o.balance)||0};
+    b.coa.push(node);
+    return {ok:true,node}; },
   coaDelete(id){ const b=this.curBiz(); const n=b.coa.find(x=>x.id===id); if(!n) return;
     if(n.mandatory||n.control){ alert('This account can\u2019t be deleted.'); return; }
     if(n.type==='group'&&b.coa.some(x=>x.parent===id)){ alert('Move or delete the accounts inside this group first.'); return; }
@@ -4330,7 +4400,7 @@ const App = {
     (R.receipts||[]).forEach(function(r){ if(self._inRange(r.date,from,to)) inp+=Number(r.amount)||0; });
     (R.payments||[]).forEach(function(r){ if(self._inRange(r.date,from,to)) out+=Number(r.amount)||0; });
     return {in:inp,out:out,net:inp-out}; },
-  _dashInvoiceStatus(b){ var self=this; var out={Paid:0,Unpaid:0,Overdue:0,Draft:0};
+  _dashInvoiceStatus(b){ var self=this; var out={Paid:0,'Partially paid':0,Unpaid:0,Overdue:0,Draft:0};
     ((b.records&&b.records.salesInv)||[]).forEach(function(r){ var st=self.invStatus(r);
       if(out[st]==null) out[st]=0; out[st]++; });
     return out; },
@@ -4418,7 +4488,7 @@ const App = {
       '<div class="legend"><span><i style="background:var(--accent-solid)"></i>Revenue</span>'+
       '<span><i style="background:var(--info)"></i>Expenses</span></div>'; },
   _dashDonut(counts){
-    var order=[['Paid','var(--success)'],['Unpaid','var(--warn)'],['Overdue','var(--danger)'],['Draft','var(--muted-2)']];
+    var order=[['Paid','var(--success)'],['Partially paid','var(--info)'],['Unpaid','var(--warn)'],['Overdue','var(--danger)'],['Draft','var(--muted-2)']];
     var total=order.reduce(function(a,o){ return a+(counts[o[0]]||0); },0);
     var r=52,c=2*Math.PI*r,off=0;
     var arcs=order.map(function(o){ var v=counts[o[0]]||0; if(!v) return '';
@@ -4589,15 +4659,24 @@ const App = {
     const bsMap={assets:S.balanceSheet[0],liabilities:S.balanceSheet[1],equity:S.balanceSheet[2]};
     let bsOut=''; (b.coaTop&&b.coaTop.bs||BS).forEach(id=>{ if(bsMap[id]) bsOut+=this.sectionHtml(bsMap[id]); else { const n=(b.coa||[]).find(x=>x.id===id); if(n&&n.type==='total') bsOut+=this.totalLineHtml(n.name,totals[id]||0); } });
     let plOut='',gi=0; (b.coaTop&&b.coaTop.pl||[]).forEach(id=>{ const n=(b.coa||[]).find(x=>x.id===id); if(!n) return; if(n.type==='group'){ const sec=S.profitLoss[gi++]; if(sec) plOut+=this.sectionHtml(sec); } else if(n.type==='total') plOut+=this.totalLineHtml(n.name,totals[id]||0); });
-    /* The dashboard sits above the statements it is derived from — both read
-       the same engine, so the cards and the Balance Sheet always agree. */
-    let dash=''; try{ dash=this.dashboardHtml(b); }catch(e){ dash=''; }
-    return this.crumb('Dashboard')+
+    /* Summary is the statements. The cards and charts derived from them live on
+       the Dashboard tab above it — both read the same engine, so the two always
+       agree. */
+    return this.crumb('Summary')+
       '<div class="ws-tabrow"><span class="ws-tab active">Summary</span><button class="btn btn-sm" onclick="App.editSummary()">Edit</button></div>'+
       '<div class="ws-period">'+periodTxt+'</div>'+
-      dash+
       '<div class="sum-grid"><div class="sum-col"><div class="col-label">Balance Sheet</div>'+bsOut+'</div>'+
       '<div class="sum-col"><div class="col-label">Profit and Loss Statement</div>'+plOut+'</div></div>';
+  },
+  /* The Dashboard tab: the same cards, charts and panels that used to sit on top
+     of the Summary, on a page of their own. */
+  dashboardPageHtml(b){
+    const p=b.period||{}; const periodTxt=p.from&&p.to?('For the period '+this.fmtDate(p.from)+' – '+this.fmtDate(p.to)):'';
+    let dash=''; try{ dash=this.dashboardHtml(b); }catch(e){ dash=''; }
+    return this.crumb('Dashboard')+
+      '<div class="ws-tabrow"><span class="ws-tab active">Dashboard</span><button class="btn btn-sm" onclick="App.editSummary()">Edit period</button></div>'+
+      '<div class="ws-period">'+periodTxt+'</div>'+
+      dash;
   },
   totalLineHtml(name,val){ return '<div class="sum-card"><div class="sum-net sum-total-line"><span>'+this.esc(name)+'</span><span class="num">'+this.money(val)+'</span></div></div>'; },
   sectionHtml(sec){ const rows=(sec.children||[]).map(n=>this.nodeHtml(n,0)).join('');
@@ -4608,7 +4687,9 @@ const App = {
       return h+node.children.map(c=>this.nodeHtml(c,depth+1)).join(''); }
     const amt=this.money(node.amt||0); const cell=node.id?'<a class="led-link" onclick="App.openGL(\''+node.id+'\')">'+amt+'</a>':amt;
     return '<div class="sum-row" style="padding-left:'+pad+'px"><span class="rn">'+this.esc(node.name)+'</span><span class="ra blue num">'+cell+'</span></div>'; },
-  editSummary(){ this.wsMode='summaryEdit'; this.renderMain(this.curBiz()); },
+  /* The period drives both pages, so editing it returns to whichever one asked. */
+  editSummary(){ this._periodReturn=(this.wsMode==='dashboard')?'dashboard':'summary';
+    this.wsMode='summaryEdit'; this.renderMain(this.curBiz()); },
   periodFormHtml(b){
     const p=b.period||{mode:'ytd',from:'2026-01-01',to:'2026-05-29',excludeZero:false,description:'Summary'};
     const opt=(v,l)=>'<option value="'+v+'"'+(p.mode===v?' selected':'')+'>'+l+'</option>'; const custom=p.mode==='custom';
@@ -4631,8 +4712,8 @@ const App = {
     if(!from||!to){ alert('Please set both From and Until dates.'); return; }
     if(from>to){ alert('“From” date must be on or before the “Until” date.'); return; }
     b.period={mode,from,to,excludeZero:document.getElementById('edZero').checked,description:document.getElementById('edDesc').value.trim()||'Summary'};
-    this.saveBiz(b); this.wsMode='summary'; this.renderMain(b); },
-  cancelEdit(){ this.wsMode='summary'; this.renderMain(this.curBiz()); },
+    this.saveBiz(b); this.wsMode=this._periodReturn||'summary'; this.renderMain(b); },
+  cancelEdit(){ this.wsMode=this._periodReturn||'summary'; this.renderMain(this.curBiz()); },
 
   /* ---------- users ---------- */
   showNewUser(){ this.go('newUser'); ['nuName','nuUser','nuPass'].forEach(i=>document.getElementById(i).value=''); document.getElementById('nuName').focus(); },

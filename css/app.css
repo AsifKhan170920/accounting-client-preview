@@ -6,9 +6,9 @@
      components need no dark-mode rules of their own.
 
      Two families to keep straight:
-       --surface / --bg / --ink   the light content area
-       --nav-*                    the dark sidebar, which stays dark in both
-                                  themes and therefore has its own ramp
+       --surface / --bg / --ink   the content area
+       --nav-*                    the sidebar rail, which keeps its own ramp:
+                                  cream in the light theme, dark in the dark one
      =================================================================== */
   :root{
     /* brand / accent */
@@ -46,10 +46,12 @@
     --toolbar:#FFFFFF; --toolbar-line:#E7E0D7;
     --cream:#FAF8F5; --cream-line:#F0EBE4;
 
-    /* dark sidebar — its own ramp, because it is dark in both themes */
-    --nav-bg:#171614; --nav-bg-2:#1F1E1B; --nav-ink:#EDEAE5; --nav-muted:#8C8781;
-    --nav-hover:rgba(255,255,255,.06); --nav-line:rgba(255,255,255,.08);
-    --nav-active-bg:#FFFFFF; --nav-active-ink:#EA6A24;
+    /* sidebar rail — its own ramp so it can be toned independently of the cards */
+    --nav-bg:#F6F3F0; --nav-bg-2:#EFEAE4; --nav-ink:#191714; --nav-ink-2:#4C453C;
+    --nav-muted:#6B6259; --nav-muted-2:rgba(25,23,20,.34);
+    --nav-hover:rgba(25,23,20,.055); --nav-line:#E7E0D7;
+    --nav-chip:rgba(25,23,20,.06); --nav-thumb:rgba(25,23,20,.18);
+    --nav-active-bg:#FFFFFF; --nav-active-ink:#C2410C;
 
     /* form controls */
     --field-bg:#FFFFFF; --field-line:#DFD7CC; --field-disabled:#F2EEE8;
@@ -151,22 +153,24 @@
   #app>.page,#pageWorkspace{min-height:0}
   /* pages other than the workspace keep their own scroll */
   #app>.page{overflow-y:auto}
-  .toolbar{display:flex;align-items:center;justify-content:center;background:var(--toolbar);
-    border-bottom:1px solid var(--toolbar-line);height:52px;flex:none;gap:3px;position:relative;z-index:5}
+  /* The app's one and only header row: global tabs in the middle, the open
+     business on the left and its tools on the right. It wraps rather than
+     overflows, so a narrow window gets a taller bar instead of a clipped one. */
+  .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--toolbar);
+    border-bottom:1px solid var(--toolbar-line);min-height:52px;flex:none;padding:6px 14px;
+    position:relative;z-index:5}
+  .tb-left{display:flex;align-items:center;gap:9px;min-width:0;flex:1 1 auto}
+  .tb-nav{display:flex;align-items:center;gap:3px;flex:none}
+  .tb-right{display:flex;align-items:center;gap:8px;flex:0 1 auto;margin-left:auto;min-width:0}
+  .tb-ws{display:flex;align-items:center;gap:8px;min-width:0}
+  .tb-home{color:var(--muted-2)}
   .tb-btn{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;font-size:12.5px;font-weight:600;
     color:var(--muted);border:1px solid transparent;background:transparent;border-radius:var(--radius-pill);cursor:pointer;
     transition:background-color var(--t-fast),color var(--t-fast)}
   .tb-btn:hover{background:var(--surface-3);color:var(--ink)}
   .tb-btn.active{background:var(--primary-tint);color:var(--primary-darker);font-weight:650}
-  .tb-static{display:inline-flex;align-items:center;gap:7px;padding:8px 14px;font-size:12.5px;font-weight:550;color:var(--muted)}
   .tb-ico{display:inline-grid;place-items:center;line-height:0;opacity:.7;color:currentColor}
   .tb-btn.active .tb-ico{opacity:1}
-  .tb-corner{line-height:0}
-  .tb-corner{position:absolute;display:flex;align-items:center;gap:6px;color:var(--muted-2)}
-  .tb-corner.left{left:16px}
-  .tb-corner.right{right:16px;cursor:pointer;font-size:16px;border-radius:var(--radius);padding:2px 5px;
-    transition:background-color .13s ease,color .13s ease}
-  .tb-corner.right:hover{background:var(--surface-3);color:var(--ink-2)}
 
   /* LIST PAGES */
   .page{padding:26px 28px;max-width:1140px;width:100%;margin:0 auto;flex:1}
@@ -298,6 +302,51 @@
   .st-overdue{background:var(--danger-tint);color:var(--danger);border:1px solid var(--danger-line)}
   .st-unpaid{background:var(--warn-tint);color:var(--warn);border:1px solid var(--warn-line)}
   .st-paid{background:var(--success-tint);color:var(--success);border:1px solid var(--success-line)}
+  .st-partial{background:var(--info-tint);color:var(--info);border:1px solid var(--info-line)}
+
+  /* ----- party balance beside Paid by / Paid to ----- */
+  .party-bal{display:inline-flex;align-items:baseline;gap:6px;flex:none;align-self:center;
+    padding:4px 11px;border:1px solid var(--line);border-radius:var(--radius-pill);
+    background:var(--surface-2);font-size:11.5px;line-height:1.3;white-space:nowrap}
+  .party-bal .pb-l{color:var(--muted);font-weight:550}
+  .party-bal .pb-v{color:var(--ink);font-weight:650;font-variant-numeric:tabular-nums}
+  .party-bal .pb-arrow{color:var(--muted-2)}
+  .party-bal .pb-next{color:var(--primary)}
+  .party-bal.pb-neg .pb-v{color:var(--success)}
+
+  /* ----- payment / invoice allocation panel ----- */
+  .alloc-panel{margin:14px 0 4px;display:flex;flex-direction:column;gap:12px}
+  .alloc-sec{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);overflow:hidden}
+  .alloc-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    padding:10px 14px;border-bottom:1px solid var(--line);background:var(--surface-2);
+    font-size:13px;font-weight:650;color:var(--ink)}
+  .alloc-h .alloc-amt{font-weight:500;color:var(--muted)}
+  .alloc-h .alloc-amt b{font-weight:650;color:var(--ink);font-variant-numeric:tabular-nums}
+  .alloc-note{padding:12px 14px;font-size:13px;color:var(--muted)}
+  .alloc-scroll{overflow-x:auto}
+  .alloc-tbl{width:100%;border-collapse:collapse;font-size:13px}
+  .alloc-tbl th{text-align:left;padding:8px 12px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--muted);font-weight:650;border-bottom:1px solid var(--line);white-space:nowrap}
+  .alloc-tbl td{padding:7px 12px;border-bottom:1px solid var(--line-soft);color:var(--ink);white-space:nowrap}
+  .alloc-tbl tr:last-child td{border-bottom:0}
+  .alloc-tbl .r{text-align:right}
+  /* a label for screen readers on a column that shows only a tick box */
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+  .alloc-tbl .alloc-pick-c{width:34px;padding-right:0;text-align:center}
+  .alloc-tbl input.alloc-pick{width:15px;height:15px;margin:0;cursor:pointer;accent-color:var(--accent-solid)}
+  .alloc-tbl .m{font-variant-numeric:tabular-nums}
+  .alloc-tbl input.alloc-in{width:120px!important;max-width:120px!important;text-align:right;
+    padding:5px 8px;border:1px solid var(--field-line);border-radius:var(--radius);
+    font:inherit;font-size:13px;font-variant-numeric:tabular-nums;background:var(--field-bg);color:var(--ink)}
+  .alloc-tbl input.alloc-in.bad{border-color:var(--danger);background:var(--danger-tint)}
+  .alloc-foot{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px 14px;
+    border-top:1px solid var(--line);background:var(--surface-2);font-size:13px;color:var(--muted)}
+  .alloc-foot .alloc-sp{flex:1}
+  .alloc-foot b{font-weight:650;color:var(--ink);font-variant-numeric:tabular-nums;margin-left:5px}
+  .alloc-foot b.neg{color:var(--danger)}
+  .alloc-err{padding:9px 14px;border-top:1px solid var(--danger-line);background:var(--danger-tint);
+    color:var(--danger-dark);font-size:13px;font-weight:500}
   .st-draft{background:var(--surface-3);color:var(--muted);border:1px solid var(--line)}
   .vch-inv-cols{display:flex;gap:26px;margin-top:22px;flex-wrap:wrap}
   .vch-inv-doc{max-width:760px}
@@ -412,6 +461,31 @@
   .app-modal-h{font-weight:650;font-size:15px;letter-spacing:-.014em;color:var(--ink);padding:14px 18px;border-bottom:1px solid var(--line);background:var(--surface)}
   .app-modal-b{padding:16px 18px;max-height:62vh;overflow:auto}
   .app-modal-f{display:flex;gap:8px;align-items:center;padding:12px 18px;border-top:1px solid var(--line);background:var(--surface-2)}
+
+  /* ----- quick-create dropdowns ("＋ Add New …") ----- */
+  /* Native <option> styling is honoured on Windows/Linux and ignored on macOS,
+     where the searchable panel below carries the styling instead. */
+  select option.qc-add{color:var(--primary);font-weight:650}
+  select option.qc-sep{color:var(--muted-2)}
+  .qc-err{margin:0 0 12px;padding:9px 12px;border:1px solid var(--danger-line);border-radius:var(--radius);
+    background:var(--danger-tint);color:var(--danger-dark);font-size:13px;font-weight:500}
+
+  .qc-pop{position:fixed;z-index:1300;max-width:min(420px,calc(100vw - 16px));
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow-3);overflow:hidden;display:flex;flex-direction:column}
+  .qc-pop-search{width:100%!important;max-width:none!important;border:0!important;border-bottom:1px solid var(--line)!important;
+    border-radius:0!important;padding:9px 12px!important;font-size:13px;background:var(--surface);color:var(--ink)}
+  .qc-pop-search:focus{outline:0;box-shadow:none}
+  .qc-pop-list{max-height:240px;overflow:auto;padding:4px}
+  .qc-pop-opt{padding:7px 10px;border-radius:calc(var(--radius) - 4px);font-size:13px;color:var(--ink);
+    cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .qc-pop-opt:hover{background:var(--row-hover)}
+  .qc-pop-opt.cur{font-weight:600}
+  .qc-pop-opt.on{background:var(--row-sel);color:var(--primary-darker)}
+  .qc-pop-empty{padding:12px 10px;font-size:13px;color:var(--muted)}
+  .qc-pop-add{display:block;width:100%;text-align:left;padding:10px 12px;border:0;border-top:1px solid var(--line);
+    background:var(--surface-2);color:var(--primary);font:inherit;font-size:13px;font-weight:650;cursor:pointer}
+  .qc-pop-add:hover{background:var(--primary-tint)}
   .hist-act{font-size:10.5px;font-weight:650;border-radius:var(--radius);padding:2px 9px;display:inline-block;line-height:1.6;letter-spacing:.01em;border:1px solid transparent}
   .hist-act.create{background:var(--info-tint);color:var(--info);border-color:var(--info-line)}
   .hist-act.update{background:var(--success-tint);color:var(--success);border-color:var(--success-line)}
@@ -603,30 +677,37 @@
      =================================================================== */
   .ws-body{display:flex;flex:1;min-height:0;background:var(--bg)}
 
-  /* ---- dark sidebar ---- */
+  /* ---- sidebar rail ---- */
+  /* --sf is the fit scale App._fitSidebar() sets, 1 = roomy .. 0 = tightest the
+     nav goes while staying readable. Every vertical gap below interpolates on
+     it, so the whole rail breathes on a tall window and closes up on a short
+     one instead of scrolling. */
   .sidebar{width:260px;flex:none;display:flex;flex-direction:column;overflow:hidden;
-    background:var(--nav-bg);color:var(--nav-ink)}
-  .side-scroll{flex:1;min-height:0;overflow-y:auto;padding:4px 12px 8px;
-    scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
+    background:var(--nav-bg);color:var(--nav-ink);border-right:1px solid var(--nav-line);
+    --sf:1;
+    --side-item-pad:calc(3px + 6px * var(--sf));
+    --side-item-gap:calc(2px * var(--sf));
+    --side-item-font:calc(11.5px + 1px * var(--sf));
+    --side-group-top:calc(5px + 11px * var(--sf));
+    --side-group-bot:calc(2px + 4px * var(--sf));
+    --side-block-pad:calc(4px + 10px * var(--sf))}
+  /* No scrollbar: the fit pass sizes the nav to the space it has. The class is
+     only added when even the tightest setting cannot fit, so a very short window
+     scrolls rather than putting a link out of reach. */
+  .side-scroll{flex:1;min-height:0;overflow:hidden;padding:2px 12px 4px;
+    scrollbar-width:thin;scrollbar-color:var(--nav-thumb) transparent}
+  .sidebar.side-overflow .side-scroll{overflow-y:auto}
   .side-scroll::-webkit-scrollbar{width:8px}
-  .side-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:99px;border:2px solid transparent;background-clip:content-box}
-  .side-scroll::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.24);background-clip:content-box}
+  .side-scroll::-webkit-scrollbar-thumb{background:var(--nav-thumb);border-radius:99px;border:2px solid transparent;background-clip:content-box}
+  .side-scroll::-webkit-scrollbar-thumb:hover{background:var(--nav-muted);background-clip:content-box}
 
-  /* brand block */
-  .side-brand{display:flex;align-items:center;gap:11px;padding:18px 18px 14px}
-  .side-mark{width:36px;height:36px;flex:none;border-radius:11px;display:grid;place-items:center;
-    background:var(--accent-solid);color:#fff;font-weight:800;font-size:15px;letter-spacing:-.02em;
-    box-shadow:0 4px 12px -4px rgba(234,106,36,.7)}
-  .side-brand-txt{display:flex;flex-direction:column;min-width:0}
-  .side-brand-name{display:block;font-size:13.5px;font-weight:700;color:var(--nav-ink);letter-spacing:-.015em;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .side-brand-sub{display:block;font-size:11px;color:var(--nav-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-
-  /* + Create New */
-  .side-create-wrap{padding:0 12px 14px;position:relative}
+  /* + Create New — the rail's first block, since the business name lives in the
+     workspace header rather than being repeated here */
+  .side-create-wrap{position:relative;
+    padding:calc(8px + 8px * var(--sf)) 12px calc(6px + 8px * var(--sf))}
   .side-create{width:100%;display:flex;align-items:center;gap:9px;justify-content:flex-start;
     background:var(--accent-solid);color:#fff;border:none;border-radius:var(--radius-pill);
-    padding:11px 16px;font:inherit;font-size:13px;font-weight:650;cursor:pointer;
+    padding:calc(6px + 5px * var(--sf)) 16px;font:inherit;font-size:13px;font-weight:650;cursor:pointer;
     box-shadow:0 6px 18px -8px rgba(234,106,36,.85);transition:background-color var(--t-fast),transform var(--t-fast),box-shadow var(--t-fast)}
   .side-create:hover{background:var(--accent-solid-hover);box-shadow:0 10px 24px -8px rgba(234,106,36,.9)}
   .side-create:active{transform:translateY(1px)}
@@ -645,45 +726,50 @@
 
   /* group headings */
   .side-group{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--nav-muted);padding:16px 10px 6px;user-select:none}
-  .side-group:first-child{padding-top:4px}
+    color:var(--nav-muted);padding:var(--side-group-top) 10px var(--side-group-bot);user-select:none}
+  .side-group:first-child{padding-top:calc(2px + 2px * var(--sf))}
 
   /* nav items — the active one is a large rounded pill */
-  .side-item{display:flex;align-items:center;gap:11px;padding:9px 12px;cursor:pointer;font-size:12.5px;
-    color:#B9B4AD;border-radius:12px;margin-bottom:2px;position:relative;
+  .side-item{display:flex;align-items:center;gap:11px;cursor:pointer;
+    padding:var(--side-item-pad) 12px;font-size:var(--side-item-font);line-height:1.25;
+    color:var(--nav-ink-2);border-radius:calc(8px + 4px * var(--sf));margin-bottom:var(--side-item-gap);position:relative;
     transition:background-color var(--t-fast),color var(--t-fast)}
   .side-item:hover{background:var(--nav-hover);color:var(--nav-ink)}
   .side-item.active{background:var(--nav-active-bg);color:var(--nav-active-ink);font-weight:650;
-    box-shadow:0 4px 14px -6px rgba(0,0,0,.5)}
+    box-shadow:var(--shadow-1)}
   .side-item .ico{flex:none;opacity:.72;transition:opacity var(--t-fast)}
   .side-item:hover .ico{opacity:1}
   .side-item.active .ico{opacity:1;color:var(--nav-active-ink)}
   .side-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .side-badge{font-size:10.5px;color:var(--nav-muted);background:rgba(255,255,255,.07);
+  .side-badge{font-size:10.5px;color:var(--nav-muted);background:var(--nav-chip);
     border-radius:var(--radius-pill);padding:2px 8px;font-weight:650;flex:none;font-variant-numeric:tabular-nums}
-  .side-badge.zero{color:rgba(255,255,255,.26);background:transparent}
+  .side-badge.zero{color:var(--nav-muted-2);background:transparent}
   .side-item.active .side-badge{background:var(--primary-tint);color:var(--primary-darker)}
   .side-plain{color:inherit}
-  .side-sep{height:1px;background:var(--nav-line);margin:10px 4px}
+  .side-sep{height:1px;background:var(--nav-line);margin:calc(3px + 7px * var(--sf)) 4px}
 
   /* pinned footer: settings, help, profile, logout */
-  .side-foot{flex:none;padding:10px 12px 14px;border-top:1px solid var(--nav-line);background:var(--nav-bg)}
-  .side-foot .side-item{font-size:12.5px}
-  .side-user{display:flex;align-items:center;gap:10px;padding:9px 11px;margin-top:6px;
-    border-radius:14px;background:var(--nav-bg-2);border:1px solid var(--nav-line)}
-  .side-avatar{width:32px;height:32px;flex:none;border-radius:50%;display:grid;place-items:center;
+  .side-foot{flex:none;border-top:1px solid var(--nav-line);background:var(--nav-bg);
+    padding:var(--side-block-pad) 12px calc(6px + 8px * var(--sf))}
+  .side-foot .side-item{font-size:var(--side-item-font)}
+  .side-user{display:flex;align-items:center;gap:10px;border-radius:14px;
+    padding:calc(3px + 6px * var(--sf)) 11px;margin-top:calc(2px + 4px * var(--sf));
+    background:var(--nav-bg-2);border:1px solid var(--nav-line)}
+  .side-avatar{width:calc(24px + 8px * var(--sf));height:calc(24px + 8px * var(--sf));
+    flex:none;border-radius:50%;display:grid;place-items:center;
     background:linear-gradient(140deg,var(--accent-solid),#F0A063);color:#fff;font-weight:700;font-size:12.5px}
   .side-user-txt{display:flex;flex-direction:column;min-width:0;flex:1}
   .side-user-name{display:block;font-size:12.5px;font-weight:650;color:var(--nav-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .side-user-role{display:block;font-size:10.5px;color:var(--nav-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .side-logout{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
     color:var(--nav-muted);cursor:pointer;background:none;border:none;transition:background-color var(--t-fast),color var(--t-fast)}
-  .side-logout:hover{background:rgba(255,255,255,.08);color:#F1867A}
-  .side-customize{text-align:center;color:var(--nav-muted);font-size:12px;padding:12px 0 2px;cursor:pointer;
+  .side-logout:hover{background:var(--nav-hover);color:var(--danger)}
+  .side-customize{text-align:center;color:var(--nav-muted);font-size:12px;cursor:pointer;
+    padding:calc(4px + 8px * var(--sf)) 0 2px;
     transition:color var(--t-fast)}
   .side-customize:hover{color:var(--nav-ink)}
   .side-customize.on{color:var(--accent);font-weight:650}
-  .side-cust-n{display:block;color:rgba(255,255,255,.3);font-size:10.5px;font-weight:400;margin-top:2px}
+  .side-cust-n{display:block;color:var(--nav-muted-2);font-size:10.5px;font-weight:400;margin-top:2px}
 
   /* mobile drawer */
   .side-scrim{display:none;position:fixed;inset:0;background:rgba(25,23,20,.45);z-index:70;
@@ -691,40 +777,36 @@
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   .hd-icon.nav-toggle{display:none}
 
-  /* ---- workspace header ---- */
-  .ws-head{display:flex;align-items:center;gap:14px;padding:14px 26px;flex-wrap:wrap;flex:none;
-    background:var(--bg);border-bottom:1px solid var(--line)}
-  .ws-head-left{display:flex;align-items:center;gap:12px;min-width:0}
-  .ws-close{color:var(--muted-2);cursor:pointer;line-height:0;padding:7px;border-radius:10px;
-    display:grid;place-items:center;transition:background-color var(--t-fast),color var(--t-fast)}
+  /* ---- open business, in the toolbar's left group ---- */
+  .ws-close{color:var(--muted-2);cursor:pointer;line-height:0;padding:6px;border-radius:9px;
+    display:grid;place-items:center;flex:none;transition:background-color var(--t-fast),color var(--t-fast)}
   .ws-close:hover{color:var(--danger);background:var(--danger-tint)}
-  .ws-biz-name{font-weight:750;font-size:19px;letter-spacing:-.022em;color:var(--ink);
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .ws-head-left a{font-size:12px;color:var(--muted);font-weight:500}
-  .ws-head-left a:hover{color:var(--primary)}
-  .ws-head-right{display:flex;gap:8px;align-items:center;margin-left:auto}
+  .ws-biz-name{font-weight:700;font-size:15px;letter-spacing:-.018em;color:var(--ink);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .tb-ws a{font-size:12px;color:var(--muted);font-weight:500;flex:none;cursor:pointer}
+  .tb-ws a:hover{color:var(--primary)}
 
   /* global search */
   .hd-search{position:relative;display:flex;align-items:center}
-  .hd-search .ico{position:absolute;left:13px;color:var(--muted-2);pointer-events:none}
-  .hd-search input{width:230px;padding:9px 14px 9px 38px;border:1px solid var(--line);
+  .hd-search .ico{position:absolute;left:11px;color:var(--muted-2);pointer-events:none}
+  .hd-search input{width:190px;padding:7px 14px 7px 34px;border:1px solid var(--line);
     border-radius:var(--radius-pill);background:var(--surface);font:inherit;font-size:12.5px;color:var(--ink);
     transition:border-color var(--t-fast),box-shadow var(--t-fast),width var(--t-med)}
   .hd-search input::placeholder{color:var(--muted-2)}
-  .hd-search input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring);width:280px}
+  .hd-search input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring);width:230px}
 
   /* round icon buttons in the header */
-  .hd-icon{width:38px;height:38px;flex:none;border-radius:50%;display:grid;place-items:center;
+  .hd-icon{width:34px;height:34px;flex:none;border-radius:50%;display:grid;place-items:center;
     background:var(--surface);border:1px solid var(--line);color:var(--ink-2);cursor:pointer;position:relative;
     transition:background-color var(--t-fast),border-color var(--t-fast),color var(--t-fast),box-shadow var(--t-fast)}
   .hd-icon:hover{border-color:var(--line-strong);color:var(--ink);box-shadow:var(--shadow-1)}
-  .hd-icon .dot{position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;
+  .hd-icon .dot{position:absolute;top:6px;right:7px;width:7px;height:7px;border-radius:50%;
     background:var(--accent-solid);border:2px solid var(--surface)}
 
   /* profile card */
-  .hd-user{display:flex;align-items:center;gap:9px;padding:5px 14px 5px 6px;border-radius:var(--radius-pill);
-    background:var(--surface);border:1px solid var(--line);cursor:default}
-  .hd-avatar{width:30px;height:30px;flex:none;border-radius:50%;display:grid;place-items:center;
+  .hd-user{display:flex;align-items:center;gap:9px;padding:3px 13px 3px 4px;border-radius:var(--radius-pill);
+    background:var(--surface);border:1px solid var(--line);cursor:default;flex:none}
+  .hd-avatar{width:28px;height:28px;flex:none;border-radius:50%;display:grid;place-items:center;
     background:linear-gradient(140deg,var(--accent-solid),#F0A063);color:#fff;font-weight:700;font-size:12px}
   .hd-user-txt{display:flex;flex-direction:column;min-width:0}
   .hd-user-name{display:block;font-size:12.5px;font-weight:650;color:var(--ink);line-height:1.25}
@@ -1129,18 +1211,16 @@
     body.nav-open .sidebar{transform:none}
     body.nav-open .side-scrim{display:block}
     .ws-main{padding:18px 18px 48px}
-    .ws-head{padding:12px 18px}
-    .hd-search input{width:180px}
-    .hd-search input:focus{width:210px}
+    .hd-search input{width:150px}
+    .hd-search input:focus{width:180px}
+    .hd-user-txt{display:none}
+    .hd-user{padding:3px}
   }
   @media (max-width:760px){
-    .ws-head{gap:10px;padding:10px 14px}
-    .ws-biz-name{font-size:17px}
-    .ws-head-right{width:100%;margin-left:0;order:3}
+    .tb-right{width:100%;margin-left:0;order:3}
+    .tb-ws{flex:1;min-width:0}
     .hd-search{flex:1}
     .hd-search input,.hd-search input:focus{width:100%}
-    .hd-user-txt{display:none}
-    .hd-user{padding:5px}
     .ws-main{padding:14px 14px 44px}
     .dash-stats{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
     .stat{padding:16px 17px}
@@ -1155,7 +1235,7 @@
   }
   @media (max-width:520px){
     .dash-stats{grid-template-columns:1fr}
-    .ws-head-left a{display:none}
+    .tb-ws a{display:none}
     .seg-sw button{padding:5px 10px;font-size:11px}
   }
   /* honour the OS "reduce motion" setting */
@@ -1196,9 +1276,11 @@
     --toolbar:#1A1815; --toolbar-line:#332F2A;
     --cream:#242220; --cream-line:#332F2A;
 
-    /* the rail is already dark; nudge it so it separates from the darker canvas */
-    --nav-bg:#100F0E; --nav-bg-2:#1A1917; --nav-ink:#EDEAE5; --nav-muted:#867F77;
+    /* the rail stays dark here; nudge it so it separates from the darker canvas */
+    --nav-bg:#100F0E; --nav-bg-2:#1A1917; --nav-ink:#EDEAE5; --nav-ink-2:#B9B4AD;
+    --nav-muted:#867F77; --nav-muted-2:rgba(255,255,255,.26);
     --nav-hover:rgba(255,255,255,.06); --nav-line:rgba(255,255,255,.07);
+    --nav-chip:rgba(255,255,255,.07); --nav-thumb:rgba(255,255,255,.14);
     --nav-active-bg:#2E2B26; --nav-active-ink:#F59255;
 
     --field-bg:#141311; --field-line:#443F38; --field-disabled:#201E1B;
