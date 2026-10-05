@@ -506,7 +506,7 @@ const App = {
       '<div class="empty" style="margin-top:30px"><div class="big">'+this.esc(this.wsSection)+'</div>'+
       'This section has no register configured. Add an entry for it to <code>REG</code> in <code>js/data.js</code>.</div>'; return; }
     if(this.wsMode==='list'){ m.innerHTML=this.listHtml(b); return; }
-    if(this.wsMode==='form'){ const _k=LABEL2KEY[this.wsSection]; m.innerHTML=this.formHtml(b); var _self=this; setTimeout(function(){ _self._mountDesignedForm(_k); try{ QuickCreate.scan(m); }catch(e){} },0); return; }
+    if(this.wsMode==='form'){ const _k=LABEL2KEY[this.wsSection]; m.innerHTML=this.formHtml(b); var _self=this; setTimeout(function(){ if(_self._nativeTxnForm(_self.curBiz(),_k)) TxnForms.mount(_k); else _self._mountDesignedForm(_k); try{ QuickCreate.scan(m); }catch(e){} },0); return; }
     if(this.wsMode==='view'){ m.innerHTML=this.viewHtml(b); return; }
     if(this.wsMode==='ledger'){ m.innerHTML=this.ledgerHtml(b); return; }
     if(this.wsMode==='glledger'){ m.innerHTML=this.glLedgerHtml(b); return; }
@@ -755,8 +755,13 @@ const App = {
     if(d.dueDays!=null && d.dueDays!=='' && pf.dueDays==null){ pf.dueType='Net'; pf.dueDays=d.dueDays; }
     if(d.taxCode && !pf.defaultTaxCode) pf.defaultTaxCode=d.taxCode;
     return pf; },
+  /* Receipts, payments and sales invoices use the native voucher engine
+     (js/txn-forms.js) unless the business switched that form to the Form
+     Designer path: b.formEngine[key]==='designed'. */
+  _nativeTxnForm(b,key){ return typeof TxnForms!=='undefined' && !!TxnForms.handles(b,key); },
   formHtml(b){
     const key=LABEL2KEY[this.wsSection]; const c=this.cfg();
+    if(this._nativeTxnForm(b,key)) return TxnForms.formHtml(b,key);
     try{ this._ensureDefaultTemplate(key); }catch(e){}
     try{ this._refreshTemplateFromState(key); }catch(e){}
     const _erec=(this.editingId!=null)?(this.records(b)||[]).find(function(x){return x.id===App.editingId;}):null;
@@ -769,7 +774,8 @@ const App = {
         '<div class="form-actions"><button class="btn btn-primary" onclick="App.saveDesignedRecord(\''+key+'\')">'+(this.editingId!=null?'Update':'Create')+'</button>'+
         '<button class="btn" onclick="App.backFromRecord()||App.backToList()">Cancel</button>'+
         (this.editingId!=null?'<button class="btn btn-sm" style="background:#d64545;border-color:#d64545;color:#fff" onclick="App.deleteRecord('+JSON.stringify(this.editingId)+')">Delete</button>':'')+
-        '<button class="btn btn-sm" style="margin-left:auto" onclick="App.openDesignerFor(\''+key+'\')" title="Edit this form\u2019s design">\u270e Edit design</button></div>';
+        '<button class="btn btn-sm" style="margin-left:auto" onclick="App.openDesignerFor(\''+key+'\')" title="Edit this form\u2019s design">\u270e Edit design</button>'+
+        ((typeof TxnForms!=='undefined'&&TxnForms.KEYS[key])?'<button class="btn btn-sm" onclick="TxnForms.setEngine(\''+key+'\',\'native\')" title="Switch back to the standard entry form">Use standard form</button>':'')+'</div>';
     }
     return this.recCrumb((c?c.label:this.wsSection), title)+
       '<div class="card"><div class="card-head"><h2 style="margin:0">'+this.esc(title)+'</h2></div>'+
@@ -1475,7 +1481,8 @@ const App = {
   copyTo(targetKey){ this._closeOverlay(); var b=this.curBiz(); var key=LABEL2KEY[this.wsSection]; var rec=this.records(b).find(r=>r.id===this.editingId); if(!rec) return; var label=KEY2LABEL[targetKey]; if(!label){ alert('Cannot copy to that document.'); return; }
     var total=0; (rec.lines||[]).forEach(function(ln){ total+=Number(ln.amount||0)||0; }); if(!total) total=Number(rec.amount||0)||0;
     var pf;
-    if(key==='salesInv'&&targetKey==='receipts'){ pf={ date:rec.date, customer:rec.customer, receivedIn:'', lines:[{accountName:'Accounts receivable', sub:rec.customer, amount:total}] }; }
+    if(key==='salesInv'&&targetKey==='receipts'&&typeof TxnForms!=='undefined'){ pf=TxnForms.receiptPrefill(b,rec); }
+    else if(key==='salesInv'&&targetKey==='receipts'){ pf={ date:rec.date, customer:rec.customer, receivedIn:'', lines:[{accountName:'Accounts receivable', sub:rec.customer, amount:total}] }; }
     else if(key==='purchInv'&&targetKey==='payments'){ pf={ date:rec.date, supplier:rec.supplier, paidFrom:'', lines:[{accountName:'Accounts payable', sub:rec.supplier, amount:total}] }; }
     else { pf=JSON.parse(JSON.stringify(rec)); delete pf.id; delete pf.uuid; delete pf.reference; }
     this._prefill=pf; this.recReturn=null; this.histReturn=false; this.wsSection=label; this.editingId=null; this.wsMode='form'; this.renderWorkspace(); },
