@@ -537,7 +537,7 @@ const App = {
     const ftActs=[['Edit columns','App.editColumns()'],['Batch Operations','App.batchMenu()'],['Copy to clipboard','App.copyTable()']];
     if(this._sectionKey()==='bankCash') ftActs.push(['Import bank statement','App.bankImportOpen()']);
     const ftBtns=ftActs.map(t=>'<button class="ftbtn" onclick="'+t[1]+'">'+(t[0]==='Batch Operations'?'▸ ':'')+t[0]+'</button>').join('');
-    const batchBar = bm ? ('<div class="batch-bar">Select rows to delete, then <button class="btn btn-sm" style="background:#d64545;border-color:#d64545;color:#fff" onclick="App.batchDeleteRun()">Delete selected (<span id="batchCount">'+Object.keys(this.batchSel||{}).length+'</span>)</button> <button class="btn btn-sm" onclick="App.batchCancel()">Cancel</button></div>') : '';
+    const batchBar = bm ? ('<div class="batch-bar">Select rows to delete, then <button class="btn btn-sm btn-danger" onclick="App.batchDeleteRun()">Delete selected (<span id="batchCount">'+Object.keys(this.batchSel||{}).length+'</span>)</button> <button class="btn btn-sm" onclick="App.batchCancel()">Cancel</button></div>') : '';
     const pager = rows.length ? this._pagerBar(p,'reg') : '';
     const foot='<div class="reg-foot"><span class="cnt">'+tcount+' '+(tcount===1?'record':'records')+'</span>'+ftBtns+total+'</div>';
     /* the rounded shell stays put; only the columns scroll on narrow screens */
@@ -805,7 +805,7 @@ const App = {
   cfSetGrid(key,id,which,val){ const b=this.curBiz(); const c=this.cfgEnsure(b,key); c.entryGrid=c.entryGrid||{}; const cur=c.entryGrid[id]||{r:1,c:1}; let n=parseInt(val,10); if(isNaN(n)||n<0) n=0; if((which==='r'||which==='c')&&n<1) n=1; cur[which]=n; c.entryGrid[id]=cur; this.fmtTouch(); this.fmtBuilderRerender(); },
   fmtBuilderRerender(){ const b=this.curBiz(); const key=this.fmtForm; if(!key) return; const el=document.getElementById('efPrev'); if(el) el.innerHTML=this.entryBuilderHtml(b,key); },
   cfSetRefPrefix(key,val){ const b=this.curBiz(); const c=this.cfgEnsure(b,key); c.refPrefix=String(val||'').replace(/\s+/g,'').toUpperCase().trim(); this.fmtTouch(); const h=document.getElementById('refPrefixHint'); if(h) h.textContent='New auto references: '+(c.refPrefix?(c.refPrefix+'-0001'):'1, 2, 3…'); },
-  fmtTouch(){ const u=document.getElementById('fmtUpdateBtn'); if(u) u.disabled=false; const d=document.getElementById('fmtDiscardBtn'); if(d) d.disabled=false; const s=document.getElementById('fmtStatus'); if(s){ s.textContent='\u25CF Unsaved changes \u2014 click Update to apply'; s.style.color='#c1781f'; } },
+  fmtTouch(){ const u=document.getElementById('fmtUpdateBtn'); if(u) u.disabled=false; const d=document.getElementById('fmtDiscardBtn'); if(d) d.disabled=false; const s=document.getElementById('fmtStatus'); if(s){ s.textContent='\u25CF Unsaved changes \u2014 click Update to apply'; s.style.color='var(--warn)'; } },
   sizeAttr(g){ if(!g) return ''; let s=''; if(g.w) s+='--iw:'+g.w+'px;'; if(g.h) s+='--ih:'+g.h+'px;'; let a=''; if(g.w) a+=' data-iw'; if(g.h) a+=' data-ih'; return (s?(' style="'+s+'"'):'')+a; },
   /* ----- line items ----- */
   blankLines(c){ return c.lines.kind==='journal' ? [{},{}] : [{}]; },
@@ -1266,7 +1266,7 @@ const App = {
       ((this.formCfg(b,key)||{}).custom||[]).filter(x=>x.type==='line').forEach(x=>colDefs.push({k:x.key,th:x.label||'',align:x.a||((x.dataType==='number'||x.dataType==='formula')?'right':'left'),present:true,cell:ln=>this.cfDisplayValue(x,ln[x.key],this.cfLineCtx(ln,{subtotal:rec.subtotal,total:rec.total})),sum:''}));
       const shown=this.applyColCfg(b,key,colDefs); const ncol=shown.length;
       const wst=cd=>'text-align:'+cd.align+(cd.w?';min-width:'+cd.w+'px;width:'+cd.w+'px':'')+(cd.h?';height:'+cd.h+'px':'');
-      const thr='<tr class="iv-thr">'+shown.map(cd=>'<th'+(ed?' draggable="true" ondragstart="App.fmtDragCol(\''+cd.k+'\')" ondragover="event.preventDefault()" ondrop="App.fmtDropCol(\''+cd.k+'\')" onclick="App.selectFmtCol(\''+cd.k+'\')"':'')+' style="'+wst(cd)+(ed?';cursor:grab'+(selK===cd.k?';outline:2px solid #2389d6;outline-offset:-2px':''):'')+'">'+e(cd.th)+(ed?' <span class="iv-grip">\u22EE\u22EE</span>':'')+(ed&&selK===cd.k?' \u270E':'')+'</th>').join('')+'</tr>';
+      const thr='<tr class="iv-thr">'+shown.map(cd=>'<th'+(ed?' draggable="true" ondragstart="App.fmtDragCol(\''+cd.k+'\')" ondragover="event.preventDefault()" ondrop="App.fmtDropCol(\''+cd.k+'\')" onclick="App.selectFmtCol(\''+cd.k+'\')"':'')+' style="'+wst(cd)+(ed?';cursor:grab'+(selK===cd.k?';outline:2px solid var(--primary);outline-offset:-2px':''):'')+'">'+e(cd.th)+(ed?' <span class="iv-grip">\u22EE\u22EE</span>':'')+(ed&&selK===cd.k?' \u270E':'')+'</th>').join('')+'</tr>';
       const rowsH=lns.map((ln,idx)=>'<tr class="iv-row'+(idx===lns.length-1?' iv-lastrow':'')+'">'+shown.map(cd=>'<td style="'+wst(cd)+'">'+cd.cell(ln,idx)+'</td>').join('')+'</tr>').join('');
       const anySum=shown.some(cd=>cd.sum);
       const coltot=anySum?'<tr class="iv-coltot">'+shown.map(cd=>'<td style="text-align:'+cd.align+'">'+(cd.sum||'')+'</td>').join('')+'</tr>':'';
@@ -1324,7 +1324,7 @@ const App = {
     const title=(rec.customTitleOn&&rec.customTitle)?rec.customTitle:(c.singular||'Document');
     const fmt=v=>e(this.fmtDateUS(v));
     const ivTable=(cols,rowsData,totals)=>{ const n=cols.length;
-      const thr='<tr class="iv-thr">'+cols.map(cc=>'<th style="text-align:'+cc.align+(cc.w?';min-width:'+cc.w+'px;width:'+cc.w+'px':'')+(cc.h?';height:'+cc.h+'px':'')+(ed&&cc.k?';cursor:pointer'+(selK===cc.k?';outline:2px solid #2389d6;outline-offset:-2px':''):'')+'"'+(ed&&cc.k?' onclick="App.selectFmtCol(\''+cc.k+'\')"':'')+'>'+e(cc.th)+(ed&&selK===cc.k?' \u270E':'')+'</th>').join('')+'</tr>';
+      const thr='<tr class="iv-thr">'+cols.map(cc=>'<th style="text-align:'+cc.align+(cc.w?';min-width:'+cc.w+'px;width:'+cc.w+'px':'')+(cc.h?';height:'+cc.h+'px':'')+(ed&&cc.k?';cursor:pointer'+(selK===cc.k?';outline:2px solid var(--primary);outline-offset:-2px':''):'')+'"'+(ed&&cc.k?' onclick="App.selectFmtCol(\''+cc.k+'\')"':'')+'>'+e(cc.th)+(ed&&selK===cc.k?' \u270E':'')+'</th>').join('')+'</tr>';
       const rws=rowsData.map((r,i)=>'<tr class="iv-row'+(i===rowsData.length-1?' iv-lastrow':'')+'">'+r.map((cell,j)=>'<td style="text-align:'+cols[j].align+(cols[j].w?';min-width:'+cols[j].w+'px;width:'+cols[j].w+'px':'')+(cols[j].h?';height:'+cols[j].h+'px':'')+'">'+cell+'</td>').join('')+'</tr>').join('');
       const anySum=cols.some(cc=>cc.sum); const ct=anySum?'<tr class="iv-coltot">'+cols.map(cc=>'<td style="text-align:'+cc.align+'">'+(cc.sum||'')+'</td>').join('')+'</tr>':'';
       const tt=(totals||[]).map(t=>'<tr class="iv-tot"><td colspan="'+(n-1)+'"'+(t.emph?' style="font-weight:700"':'')+'>'+e(t.label)+'</td><td class="iv-totbox"'+(t.emph?' style="font-weight:700"':'')+'>'+this.money(t.val)+'</td></tr>').join('');
@@ -1388,7 +1388,7 @@ const App = {
         pager+'</div>'+
       inner+
       '<div class="doc-foot"><span style="display:flex;gap:8px"><button class="ftbtn" onclick="App.txnJournal()">Transaction Journal</button></span></div>'+
-      '<div class="form-actions"><button class="btn btn-primary" onclick="App.editRecord('+JSON.stringify(this.editingId)+')">Edit</button><button class="btn" onclick="App.historyBack()||App.backFromRecord()||App.backToList()">Close</button>'+((this.histReturn&&this.histEntry&&!this.histEntry.synthetic&&!this.histEntry.undone&&this.histEntry.id)?'<button class="btn btn-sm" style="color:#c0392b;border-color:#e2b8b8" onclick="App.historyUndoFromView()">↺ Undo this change</button>':'')+'<button class="btn btn-sm" style="margin-left:auto;background:#d64545;border-color:#d64545;color:#fff" onclick="App.deleteRecord('+JSON.stringify(this.editingId)+')">Delete</button></div></div>';
+      '<div class="form-actions"><button class="btn btn-primary" onclick="App.editRecord('+JSON.stringify(this.editingId)+')">Edit</button><button class="btn" onclick="App.historyBack()||App.backFromRecord()||App.backToList()">Close</button>'+((this.histReturn&&this.histEntry&&!this.histEntry.synthetic&&!this.histEntry.undone&&this.histEntry.id)?'<button class="btn btn-sm" style="color:#c0392b;border-color:#e2b8b8" onclick="App.historyUndoFromView()">↺ Undo this change</button>':'')+'<button class="btn btn-sm btn-danger" style="margin-left:auto" onclick="App.deleteRecord('+JSON.stringify(this.editingId)+')">Delete</button></div></div>';
   },
   viewNav(d){ const b=this.curBiz(); const list=this.records(b); const idx=list.findIndex(r=>r.id===this.editingId); const n=idx+d; if(n<0||n>=list.length) return; this.editingId=list[n].id; this.renderMain(b); },
   cloneRecord(){ const b=this.curBiz(); const rec=this.records(b).find(r=>r.id===this.editingId); if(!rec) return; const cp=JSON.parse(JSON.stringify(rec)); delete cp.id; delete cp.uuid; delete cp.reference; this._prefill=cp; this.recReturn=null; this.histReturn=false; this.editingId=null; this.wsMode='form'; this.renderWorkspace(); },
@@ -1843,7 +1843,7 @@ const App = {
       '<table class="reg-tbl"><thead><tr><th class="act"></th><th class="act"></th><th>From</th><th>To</th><th>'+(reg.method?'Accounting method':'Column')+'</th></tr></thead><tbody>'+(rows||'<tr><td colspan="5"><div class="reg-empty">No saved reports yet. Click <b>New Report</b>.</div></td></tr>')+'</tbody></table>'+
       '<div class="reg-foot"><span class="cnt">'+list.length+'</span></div></div>'; },
   reportEditHtml(b, key, id){ var self=this; var reg=this._REPDEF[key]||{}; var inst=this._getInst(b,key,id); if(!inst){ this.repMode='list'; return this.reportListHtml(b,key); }
-    var cmpBlock = reg.cmp ? ((inst.comparatives||[]).map(function(c,ix){ return '<div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:6px">'+'<div><label class="rp-lbl">From</label><br><input id="rp_cmp_'+ix+'_from" type="date" class="rp-in" value="'+self.esc(c.from||'')+'"></div>'+'<div><label class="rp-lbl">To</label><br><input id="rp_cmp_'+ix+'_to" type="date" class="rp-in" value="'+self.esc(c.to||'')+'"></div>'+'<div><label class="rp-lbl">Column name</label><br><input id="rp_cmp_'+ix+'_col" class="rp-in" value="'+self.esc(c.colName||'Comparative')+'"></div>'+'<button class="btn btn-xs" style="background:#d64545;border-color:#d64545;color:#fff" onclick="App.delComparative(\''+key+'\',\''+id+'\','+ix+')">Remove</button></div>'; }).join('')+'<button class="btn btn-sm" onclick="App.addComparative(\''+key+'\',\''+id+'\')">\u25b8 Add comparative column</button>') : '';
+    var cmpBlock = reg.cmp ? ((inst.comparatives||[]).map(function(c,ix){ return '<div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:6px">'+'<div><label class="rp-lbl">From</label><br><input id="rp_cmp_'+ix+'_from" type="date" class="rp-in" value="'+self.esc(c.from||'')+'"></div>'+'<div><label class="rp-lbl">To</label><br><input id="rp_cmp_'+ix+'_to" type="date" class="rp-in" value="'+self.esc(c.to||'')+'"></div>'+'<div><label class="rp-lbl">Column name</label><br><input id="rp_cmp_'+ix+'_col" class="rp-in" value="'+self.esc(c.colName||'Comparative')+'"></div>'+'<button class="btn btn-xs btn-danger" onclick="App.delComparative(\''+key+'\',\''+id+'\','+ix+')">Remove</button></div>'; }).join('')+'<button class="btn btn-sm" onclick="App.addComparative(\''+key+'\',\''+id+'\')">\u25b8 Add comparative column</button>') : '';
     var acctSel = reg.acct ? ('<div style="margin-top:12px"><label class="rp-lbl">Account</label><br><select id="rp_acct" class="rp-in" style="min-width:280px"><option value="">All accounts</option>'+(b.coa||[]).filter(function(n){ return n.type==='account'; }).map(function(n){ return '<option value="'+n.id+'"'+(inst.acctId===n.id?' selected':'')+'>'+self.esc(typeof acctPath==='function'?acctPath(b,n):(n.name||''))+'</option>'; }).join('')+'</select></div>') : '';
     var partySel = (key==='custx'||key==='suptx') ? (function(){ var pk=key==='custx'?'customers':'suppliers'; var lbl=key==='custx'?'Customer':'Supplier'; return '<div style="margin-top:12px"><label class="rp-lbl">'+lbl+'</label><br><select id="rp_party" class="rp-in" style="min-width:240px"><option value="">All</option>'+(((b.records&&b.records[pk])||[]).map(function(p){ return '<option value="'+self.esc(p.name)+'"'+(inst.party===p.name?' selected':'')+'>'+self.esc(p.name)+'</option>'; }).join(''))+'</select></div>'; })() : '';
     var bankSel = reg.bankPick ? ('<div style="margin-top:12px"><label class="rp-lbl">Bank / cash account</label><br><select id="rp_bank" class="rp-in" style="min-width:240px"><option value="">All bank &amp; cash accounts</option>'+(((b.records&&b.records.bankCash)||[]).map(function(p){ return '<option value="'+self.esc(p.name)+'"'+(inst.bank===p.name?' selected':'')+'>'+self.esc(p.name)+'</option>'; }).join(''))+'</select></div>') : '';
@@ -1872,7 +1872,7 @@ const App = {
         '<label class="chk-row"><input type="checkbox" id="rp_zero"'+(inst.excludeZero?' checked':'')+'> Exclude zero balances</label>'+
         '<label class="chk-row"><input type="checkbox" id="rp_theme"'+(inst.customTheme?' checked':'')+'> Custom theme</label>'+
       '</div>'+
-      '<div class="form-actions"><button class="btn btn-primary" onclick="App.reportSave(\''+key+'\',\''+id+'\')">Update</button><button class="btn" style="background:#d64545;border-color:#d64545;color:#fff" onclick="App.reportDelete(\''+key+'\',\''+id+'\')">Delete</button></div>'+
+      '<div class="form-actions"><button class="btn btn-primary" onclick="App.reportSave(\''+key+'\',\''+id+'\')">Update</button><button class="btn btn-danger" onclick="App.reportDelete(\''+key+'\',\''+id+'\')">Delete</button></div>'+
       '</div>'; },
   reportViewHtml(b, key, id){ var inst=this._getInst(b,key,id); if(!inst){ this.repMode='list'; return this.reportListHtml(b,key); }
     this._repCtx={key:key, inst:inst}; var html='';
@@ -2638,7 +2638,7 @@ const App = {
       '<table class="reg-tbl"><thead><tr><th>Account</th><th class="r">Debit</th><th class="r">Credit</th></tr></thead><tbody>'+body+
       '</tbody><tfoot><tr style="font-weight:700;border-top:2px solid var(--line)"><td>Total</td><td class="r m">'+this.money(tb.dr)+'</td><td class="r m">'+this.money(tb.cr)+'</td></tr></tfoot></table>'+
       (bal?'<div class="info-bar" style="color:#2e7d32;border-color:#bfe3c2;background:#f1f9f1">In balance — total debits equal total credits.</div>'
-          :'<div class="info-bar" style="color:#b06a00;border-color:#f0d9b5;background:#fdf6ec">Out of balance by '+this.money(Math.abs(tb.dr-tb.cr))+'. This usually means an opening balance was entered without an offsetting capital/equity entry.</div>')+
+          :'<div class="info-bar" style="color:var(--warn);border-color:var(--warn-line);background:var(--warn-tint)">Out of balance by '+this.money(Math.abs(tb.dr-tb.cr))+'. This usually means an opening balance was entered without an offsetting capital/equity entry.</div>')+
       this.repFoot(); },
   partyReportHtml(b,key,title,fn){ const list=((b.records&&b.records[key])||[]).map(p=>({name:p.name,bal:fn(b,p.name)})).filter(x=>Math.abs(x.bal)>0.005);
     list.sort((a,b)=>b.bal-a.bal); const tot=list.reduce((a,x)=>a+x.bal,0);
@@ -2755,7 +2755,7 @@ const App = {
     var actions='<div style="margin-top:14px;display:flex;gap:10px;align-items:center">'+
       (liveRec?'<button class="btn btn-primary" onclick="App.historyEditRecord()">Edit</button>':'')+
       '<button class="btn" onclick="App.openTool(\'history\')">Close</button>'+
-      (liveRec?'<button class="btn" style="margin-left:auto;background:#d64545;border-color:#d64545;color:#fff" onclick="App.historyDeleteRecord()">Delete</button>':'')+
+      (liveRec?'<button class="btn btn-danger" style="margin-left:auto" onclick="App.historyDeleteRecord()">Delete</button>':'')+
       '</div>';
     return this.histCrumb()+
       '<div class="hist-pagehead">History</div>'+
@@ -3780,9 +3780,9 @@ const App = {
     this.wpSaveSel(); this.wpAutoSave(); },
   wpInsertTable(){ let h='<table class="wp-lines"><tbody>'; for(let r=0;r<3;r++){ h+='<tr>'; for(let c=0;c<3;c++) h+='<td>&nbsp;</td>'; h+='</tr>'; } h+='</tbody></table><p>&nbsp;</p>'; this.wpInsertHTML(h); },
   wpSetPage(prop,val){ const b=this.curBiz(); const c=this.cfgEnsure(b,this.fmtForm); c.docPage=c.docPage||{size:'A4'}; c.docPage[prop]=val; const p=document.getElementById('wpPage'); if(p&&prop==='size') p.style.width=(val==='Letter'?'816px':'794px'); this.saveBiz(b); this.wpSaveNow(true); },
-  wpAutoSave(){ clearTimeout(this._wpTimer); const s=document.getElementById('wpStatus'); if(s){ s.textContent='Saving…'; s.style.color='#c1781f'; } this._wpTimer=setTimeout(()=>this.wpSaveNow(true),700); },
-  wpSaveNow(silent){ const b=this.curBiz(); const p=document.getElementById('wpPage'); if(!p||!this.fmtForm) return; const c=this.cfgEnsure(b,this.fmtForm); c.docHtml=p.innerHTML; if(!c.docPage) c.docPage={size:'A4'}; this.saveBiz(b); const s=document.getElementById('wpStatus'); if(s){ s.textContent=silent?'✓ Saved':'✓ All changes saved'; s.style.color='#5a9d5a'; } },
-  wpResetDoc(){ if(!confirm('Reset this voucher to the default layout? Your custom design will be replaced.')) return; const b=this.curBiz(); const def=this.wpDefaultDoc(b,this.fmtForm); const p=document.getElementById('wpPage'); if(p) p.innerHTML=def; const c=this.cfgEnsure(b,this.fmtForm); c.docHtml=def; this.saveBiz(b); const s=document.getElementById('wpStatus'); if(s){ s.textContent='✓ Reset to default'; s.style.color='#5a9d5a'; } },
+  wpAutoSave(){ clearTimeout(this._wpTimer); const s=document.getElementById('wpStatus'); if(s){ s.textContent='Saving…'; s.style.color='var(--warn)'; } this._wpTimer=setTimeout(()=>this.wpSaveNow(true),700); },
+  wpSaveNow(silent){ const b=this.curBiz(); const p=document.getElementById('wpPage'); if(!p||!this.fmtForm) return; const c=this.cfgEnsure(b,this.fmtForm); c.docHtml=p.innerHTML; if(!c.docPage) c.docPage={size:'A4'}; this.saveBiz(b); const s=document.getElementById('wpStatus'); if(s){ s.textContent=silent?'✓ Saved':'✓ All changes saved'; s.style.color='var(--success)'; } },
+  wpResetDoc(){ if(!confirm('Reset this voucher to the default layout? Your custom design will be replaced.')) return; const b=this.curBiz(); const def=this.wpDefaultDoc(b,this.fmtForm); const p=document.getElementById('wpPage'); if(p) p.innerHTML=def; const c=this.cfgEnsure(b,this.fmtForm); c.docHtml=def; this.saveBiz(b); const s=document.getElementById('wpStatus'); if(s){ s.textContent='✓ Reset to default'; s.style.color='var(--success)'; } },
   amountInWords(n,cur){ n=Number(n)||0; const neg=n<0; n=Math.abs(n); const whole=Math.floor(n); const cents=Math.round((n-whole)*100);
     const ones=['','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
     const tens=['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
@@ -3909,8 +3909,8 @@ const App = {
   vbDelete(id){ const m=this.vbModel(); const i=m.blocks.findIndex(x=>x.id===id); if(i>=0) m.blocks.splice(i,1); this.vbSync(); this.vbRerenderEditor(); },
   vbRerenderEditor(){ const el=document.getElementById('vbBlocks'); if(el) el.innerHTML=this.vbBlocksHtml(this.curBiz(),this.fmtForm); this.vbRerenderPreview(); },
   vbRerenderPreview(){ const p=document.getElementById('vbPreview'); if(p) p.innerHTML=this.vbPreviewHtml(this.curBiz(),this.fmtForm); const code=document.getElementById('vbCode'); if(code) code.value=this.vbCodeHtml(); },
-  vbSync(){ const b=this.curBiz(); const c=this.vbCfg(); c.vdoc=this.vbModel(); this.saveBiz(b); const st=document.getElementById('vbStatus'); if(st){ st.textContent='\u2713 Saved'; st.style.color='#5a9d5a'; } },
-  vbSaveNow(){ this.vbSync(); const st=document.getElementById('vbStatus'); if(st){ st.textContent='\u2713 All changes saved'; st.style.color='#5a9d5a'; } },
+  vbSync(){ const b=this.curBiz(); const c=this.vbCfg(); c.vdoc=this.vbModel(); this.saveBiz(b); const st=document.getElementById('vbStatus'); if(st){ st.textContent='\u2713 Saved'; st.style.color='var(--success)'; } },
+  vbSaveNow(){ this.vbSync(); const st=document.getElementById('vbStatus'); if(st){ st.textContent='\u2713 All changes saved'; st.style.color='var(--success)'; } },
   vbResetDoc(){ if(!confirm('Reset this voucher to the default theme? Your changes will be replaced.')) return; const c=this.vbCfg(); c.vdoc=this.vbDefaultModel(this.curBiz(),this.fmtForm); this.saveBiz(this.curBiz()); this.vbRerenderEditor(); },
   vbBack(){ this.fmtForm=null; this.fmtDraft=null; this.openFmtCat(this.fmtCat||'voucher'); },
 
@@ -4025,7 +4025,7 @@ const App = {
         (hasContent?this.fmtChecklistHtml(b,key,sc):'')+
         '<div class="form-actions"><button id="fmtUpdateBtn" class="btn btn-primary" onclick="App.commitFmtForm()"'+(dirty?'':' disabled')+'>Update form</button>'+
           '<button id="fmtDiscardBtn" class="btn" onclick="App.discardFmtForm()"'+(dirty?'':' disabled')+'>Discard changes</button>'+
-          '<span id="fmtStatus" style="font-size:12px;margin:0 6px;color:'+(dirty?'#c1781f':'#5a9d5a')+'">'+(dirty?'\u25CF Unsaved changes \u2014 click Update to apply':'\u2713 All changes applied')+'</span>'+
+          '<span id="fmtStatus" style="font-size:12px;margin:0 6px;color:'+(dirty?'var(--warn)':'var(--success)')+'">'+(dirty?'\u25CF Unsaved changes \u2014 click Update to apply':'\u2713 All changes applied')+'</span>'+
           '<span style="flex:1"></span><button class="btn" onclick="App.backFromFmtForm()">◀ Back to list</button><button class="btn" onclick="App.cfgResetForm(\''+key+'\')">Reset to defaults</button></div>'+
       '</div>'; },
   selectFmtCol(k){ this.fmtSel={type:'col',k:k}; this.renderMain(this.curBiz()); },

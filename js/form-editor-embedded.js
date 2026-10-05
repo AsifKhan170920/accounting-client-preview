@@ -766,13 +766,13 @@ const FED = {
       P+'.app-form .print-opts .po-h{font-size:12px;font-weight:700;color:#5b6573;margin-bottom:8px}\n'+
       P+'.app-form .print-opts .po-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px 16px}\n'+
       P+'.app-form .print-opts .po-item{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:400;color:#3a4253;cursor:pointer}\n'+
-      P+'.app-form .print-opts .po-item input{width:15px;height:15px;margin:0;accent-color:#0e9f6e;flex:0 0 auto}\n'+
+      P+'.app-form .print-opts .po-item input{width:15px;height:15px;margin:0;accent-color:#2563eb;flex:0 0 auto}\n'+
       P+'.app-form small{color:#888;font-size:11px}\n'+
       P+'.app-form input,.app-form textarea,.app-form select{padding:9px 11px;border:1px solid #cbd2db;border-radius:7px;font:inherit;width:100%;box-sizing:border-box}\n'+
       P+'.app-form input[readonly]{background:#f4f6f9;color:#6b7280}\n'+
       P+'.app-form .checks{display:flex;flex-direction:column;gap:6px}\n'+
       P+'.app-form .cbx{display:flex;align-items:center;gap:9px;font:inherit;cursor:pointer}\n'+
-      P+'.app-form .cbx input{width:17px;height:17px;accent-color:#0e9f6e}\n'+
+      P+'.app-form .cbx input{width:17px;height:17px;accent-color:#2563eb}\n'+
       P+'.app-form .checks label{display:flex;align-items:center;gap:8px;font-weight:400}\n'+
       P+'.app-form .checks input{width:auto}\n'+
       P+'.app-form .input-prefix{display:flex;align-items:stretch}\n'+
@@ -806,8 +806,8 @@ const FED = {
       P+'.app-form .line-items tfoot .li-tot .li-tot-lbl{text-align:right;color:#5b6573;font-weight:700}\n'+
       P+'.app-form .line-items tfoot .li-tot .li-tot-cell{text-align:right}\n'+
       P+'.app-form .li-add{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid #cfd6df;background:#fff;border-radius:7px;cursor:pointer;font:inherit;font-weight:600;color:#0b6b49;transition:.12s}\n'+
-      P+'.app-form .li-add:hover{border-color:#0e9f6e;background:#f3faf6}\n'+
-      P+'.app-form button[type=submit]{margin-top:16px;padding:10px 20px;border:0;border-radius:8px;background:#0e9f6e;color:#fff;font-weight:600;cursor:pointer}\n'+
+      P+'.app-form .li-add:hover{border-color:#2563eb;background:#e8f0fe}\n'+
+      P+'.app-form button[type=submit]{margin-top:16px;padding:10px 20px;border:0;border-radius:11px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}\n'+
       liCss+
       P+'@media print{ .app-form [data-noprint]{display:none !important} .app-form .pr-off{display:none !important} .app-form .li-actc, .app-form .li-addc, .app-form .li-add{display:none !important} }\n</style>';
     const hasLines = s.blocks.some(b=>b.type==='lines' && this.linesCols(b).length);

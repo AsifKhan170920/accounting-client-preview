@@ -98,23 +98,37 @@ describe('design tokens', () => {
       assert.ok(root.indexOf(n + ':') >= 0, `${n} missing from :root`);
   });
 
-  test('nothing in the rail assumes a dark background any more', () => {
-    /* The rail is cream in the light theme, so a hard-coded white-on-dark wash
-       would be invisible. Every such colour must come through a --nav-* token,
-       which the dark block flips. */
+  test('nothing in the rail hard-codes a wash on its background', () => {
+    /* The rail's ground is themed (CRM navy, a shade deeper in dark mode), so
+       every white-on-dark wash must come through a --nav-* token, which the
+       dark block restates, rather than being written into a rule. */
     const rail = css.slice(css.indexOf('/* ---- sidebar rail'), css.indexOf('/* ---- open business'));
     const stray = [...rail.matchAll(/rgba\(255,\s*255,\s*255[^)]*\)/g)].map((m) => m[0]);
     assert.deepEqual([...stray], []);
   });
 
-  test('the rail draws an edge, now that it shares the canvas colour family', () => {
+  test('the rail draws an edge against the canvas', () => {
     assert.match(css, /\.sidebar\{[^}]*border-right:1px solid var\(--nav-line\)/);
   });
 
-  test('generous radii and an orange accent, per the design brief', () => {
-    assert.match(root, /--radius-xl:\s*2\dpx/);
+  test('CRM radii and the CRM blue accent, per the design brief', () => {
+    /* Matches the FairTax CRM: 14px cards, pill badges, brand blue #2563eb,
+       the #f5f6f8 canvas and the navy sidebar #16294a with its #0f1e38
+       active row. */
+    assert.match(root, /--radius-xl:\s*14px/);
     assert.match(root, /--radius-pill:\s*999px/);
-    assert.ok(root.indexOf('--accent-solid:#EA6A24') >= 0);
+    assert.ok(root.indexOf('--accent-solid:#2563EB') >= 0);
+    assert.ok(root.indexOf('--bg:#F5F6F8') >= 0);
+    assert.ok(root.indexOf('--nav-bg:#16294A') >= 0);
+    assert.ok(root.indexOf('--nav-active-bg:#0F1E38') >= 0);
+  });
+
+  test('the active rail item carries the CRM blue bar', () =>
+    assert.match(css, /\.side-item\.active::before\{[^}]*width:4px[^}]*background:var\(--nav-active-bar\)/));
+
+  test('no orange from the previous theme is left in the stylesheet', () => {
+    const orange = css.match(/#(EA6A24|C2410C|F0A063|F97316|EA580C|FB923C)\b|rgba\(234,\s*106,\s*36/gi) || [];
+    assert.deepEqual([...orange], []);
   });
 
   test('reduced-motion is honoured', () =>
