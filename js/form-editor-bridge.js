@@ -14,7 +14,7 @@
       data=data||{};
       var w=window.open('','_blank'); if(!w){ alert('Allow pop-ups to open the form.'); return; }
       var bar='<div class="mf-bar" style="position:sticky;top:0;display:flex;gap:8px;justify-content:flex-end;padding:8px 12px;background:#0f1115;border-bottom:1px solid #2a2f3a">'
-        +'<button onclick="window.print()" style="padding:7px 16px;border:0;border-radius:7px;background:#0e9f6e;color:#fff;font-weight:600;cursor:pointer">Print</button>'
+        +'<button onclick="window.print()" style="padding:7px 16px;border:0;border-radius:9px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer">Print</button>'
         +'<button onclick="window.close()" style="padding:7px 14px;border:1px solid #3a4150;border-radius:7px;background:#1b1f27;color:#cfd6e2;cursor:pointer">Close</button></div>';
       var fill='<scr'+'ipt>(function(){'
         +'var DATA='+JSON.stringify(data)+';'
