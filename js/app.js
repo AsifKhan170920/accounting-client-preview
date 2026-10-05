@@ -7,9 +7,7 @@ const App = {
     try{ if(localStorage.getItem('mgr_theme')==='dark') document.body.classList.add('theme-dark'); }catch(e){}
     /* the nav re-fits itself when the window height changes */
     try{ let t=0; window.addEventListener('resize',()=>{ clearTimeout(t); t=setTimeout(()=>App._fitSidebar(),120); }); }catch(e){}
-    let accts=DB.get(DB.k.accounts,null);
-    if(!accts){ accts=[{name:'Administrator',user:'Administrator',pass:'admin'}]; DB.set(DB.k.accounts,accts); }
-    if(!DB.get(DB.k.users,null)) DB.set(DB.k.users,[{id:1,name:'Administrator',user:'Administrator',role:'Administrator'}]);
+    /* users, sessions and login live in js/users.js (authBoot below) */
     let biz=DB.get(DB.k.biz,null);
     if(!biz){ biz=[demoBusiness()]; }
     else{
@@ -31,43 +29,12 @@ const App = {
       refreshSummary(b); });
     DB.set(DB.k.biz,biz);
     try{ this.paintStaticIcons(); }catch(e){}
-    const sess=DB.get(DB.k.session,null);
-    if(sess){ this.current=sess; this.enterApp(); }
+    /* migrates old accounts, then restores the session or shows login / first-run setup */
+    if(this.authBoot) this.authBoot();
   },
 
-  /* ---------- auth ---------- */
-  setAuthMode(mode){
-    this.authMode=mode;
-    document.querySelectorAll('.auth-tab').forEach(t=>t.classList.toggle('active',t.dataset.mode===mode));
-    document.getElementById('signupName').classList.toggle('hide',mode!=='signup');
-    document.getElementById('authBtn').textContent=mode==='signup'?'Create account':'Sign in';
-    document.getElementById('authFoot').innerHTML=mode==='signup'
-      ?'Already registered? <a onclick="App.setAuthMode(\'signin\')">Sign in</a>'
-      :'No account yet? <a onclick="App.setAuthMode(\'signup\')">Create one</a>';
-    this.authError('');
-  },
-  authError(m){ const el=document.getElementById('authErr'); el.textContent=m; el.classList.toggle('hide',!m); },
-  submitAuth(){
-    const user=document.getElementById('auUser').value.trim(), pass=document.getElementById('auPass').value;
-    if(!user||!pass) return this.authError('Enter a username and password.');
-    let accts=DB.get(DB.k.accounts,[]);
-    if(this.authMode==='signup'){
-      const name=document.getElementById('suName').value.trim()||user;
-      if(accts.some(a=>a.user.toLowerCase()===user.toLowerCase())) return this.authError('That username is already taken.');
-      const acct={name,user,pass}; accts.push(acct); DB.set(DB.k.accounts,accts);
-      const users=DB.get(DB.k.users,[]); users.push({id:Date.now(),name,user,role:'Administrator'}); DB.set(DB.k.users,users);
-      this.current=acct;
-    } else {
-      const acct=accts.find(a=>a.user.toLowerCase()===user.toLowerCase()&&a.pass===pass);
-      if(!acct) return this.authError('Incorrect username or password.');
-      this.current=acct;
-    }
-    DB.set(DB.k.session,{name:this.current.name,user:this.current.user});
-    this.enterApp();
-  },
-  logout(){ localStorage.removeItem(DB.k.session); this.current=null;
-    document.getElementById('app').classList.add('hide'); document.getElementById('auth').classList.remove('hide');
-    document.getElementById('auPass').value=''; },
+  /* ---------- auth ----------
+     Login, first-run setup, MFA, logout: js/users.js. */
   toggleTheme(){ var on=document.body.classList.toggle('theme-dark'); try{ localStorage.setItem('mgr_theme', on?'dark':'light'); }catch(e){} },
   enterApp(){
     document.getElementById('auth').classList.add('hide'); document.getElementById('app').classList.remove('hide');
@@ -245,7 +212,7 @@ const App = {
   onChkChange(){ document.getElementById('removeBtn').disabled=document.querySelectorAll('.biz-chk:checked').length===0; },
   renderBusinesses(){
     const q=(document.getElementById('bizSearch').value||'').toLowerCase();
-    let list=DB.get(DB.k.biz,[]); const total=list.length;
+    let list=this.visibleBusinesses?this.visibleBusinesses():DB.get(DB.k.biz,[]); const total=list.length;
     if(q) list=list.filter(b=>b.name.toLowerCase().includes(q)||(b.country||'').toLowerCase().includes(q));
     const wrap=document.getElementById('bizListWrap'); document.getElementById('removeBtn').disabled=true;
     if(!total){ wrap.innerHTML='<div class="empty"><div class="big">No businesses yet</div>Click <b>Add Business → Create New Business</b> to get started.</div>'; document.getElementById('bizCount').textContent=''; return; }
@@ -277,19 +244,7 @@ const App = {
   /* Hidden sections are stored per business as an array of SIDEBAR labels.
      'Summary' is never hideable — it is the workspace home. */
   hiddenSections(b){ return (b&&b.sidebarHidden)||[]; },
-  isHidden(b,label){ if(label==='Summary'||label==='Dashboard') return false;
-    if(this.hiddenSections(b).indexOf(label)>=0) return true;
-    var p=this.myPermissions(b);
-    return !!(p && p.role==='Restricted' && (p.hidden||[]).indexOf(label)>=0); },
-  /* Permissions for whoever is signed in. Absent entry = full access, which is
-     what a single-user install has, so nothing changes until you set one. */
-  myPermissions(b){ if(!b||!b.permissions) return null;
-    var s=this.current||DB.get(DB.k.session,null); if(!s) return null;
-    return b.permissions[s.user]||b.permissions[s.name]||null; },
-  isReadOnly(b){ var p=this.myPermissions(b||this.curBiz()); return !!(p && p.role==='Read only'); },
-  guardWrite(b){ if(!this.isReadOnly(b||this.curBiz())) return true;
-    alert('Your access to this business is read only. Ask an administrator to change it in Settings \u2192 User Permissions.');
-    return false; },
+  /* isHidden / myPermissions / isReadOnly / guardWrite: js/users.js (per-tab View/Create/Update/Delete levels) */
   renderSidebar(b){
     const rec=b.records||{};
     const I=(n,sz)=>(window.ICO?ICO.get(n,sz||18):'');
@@ -328,7 +283,7 @@ const App = {
 
     /* reports + settings */
     html+='<div class="side-sep"></div>';
-    SIDEBAR_FOOT.forEach(([ico,label])=>{ html+=item(label,SI(label),this.wsSection===label,null); });
+    SIDEBAR_FOOT.forEach(([ico,label])=>{ if(this.isHidden(b,label)) return; html+=item(label,SI(label),this.wsSection===label,null); });
 
     const nHid=this.hiddenSections(b).length;
     html+='<div class="side-customize'+(this.wsMode==='customize'?' on':'')+'" role="button" tabindex="0"'+
@@ -3451,34 +3406,7 @@ const App = {
       ' — set which one this report uses on its Edit screen.</div>'):'';
     return this.repHead(b,def.name||'Custom Report')+this._repTbl('<th>Line</th><th class="r">Amount</th>',body,foot,2,'This report has no lines yet.')+picker+this.repFoot(); },
 
-  /* ---- user permissions ---- */
-  set_permissions(b){ var self=this; var users=DB.get(DB.k.users,[])||[]; var perms=b.permissions||{};
-    var sections=SIDEBAR.filter(function(x){ return x[2]; }).map(function(x){ return x[1]; });
-    var rows=users.map(function(u){ var who=u.user||u.name; var p=perms[who]||{role:'Full access',hidden:[]};
-      return '<tr><td>'+self.esc(u.name||who||'(unnamed)')+'</td><td>'+self.esc(u.user||'')+'</td>'+
-        '<td><select onchange="App.permRole('+JSON.stringify(who).replace(/"/g,'&quot;')+',this.value)">'+
-          ['Full access','Restricted','Read only'].map(function(o){ return '<option'+(p.role===o?' selected':'')+'>'+o+'</option>'; }).join('')+'</select></td>'+
-        '<td>'+(p.role==='Restricted'?(p.hidden&&p.hidden.length?(sections.length-p.hidden.length)+' of '+sections.length+' tabs':'all tabs'):'—')+'</td>'+
-        '<td class="r">'+(p.role==='Restricted'?('<button class="btn btn-sm" onclick="App.permEdit('+JSON.stringify(who).replace(/"/g,'&quot;')+')">Choose tabs</button>'):'')+'</td></tr>'; }).join('');
-    var editor='';
-    if(this._permEdit){ var who=this._permEdit; var p=perms[who]||{role:'Restricted',hidden:[]};
-      editor='<div style="border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:14px">'+
-        '<div style="font-weight:700;margin-bottom:8px">Tabs '+this.esc(who)+' can open</div>'+
-        '<div style="columns:3 200px">'+sections.map(function(sname){ var on=(p.hidden||[]).indexOf(sname)<0;
-          return '<label class="chk-row"><input type="checkbox"'+(on?' checked':'')+' onchange="App.permTab('+JSON.stringify(who).replace(/"/g,'&quot;')+','+JSON.stringify(sname).replace(/"/g,'&quot;')+',this.checked)"> '+self.esc(sname)+'</label>'; }).join('')+'</div>'+
-        '<button class="btn btn-sm" style="margin-top:8px" onclick="App.permEdit(null)">Done</button></div>'; }
-    var inner='<div class="info-bar">Who may open this business, and what they see once inside. <b>Read only</b> hides every New / Edit / Delete control; <b>Restricted</b> also limits which tabs appear.</div>'+
-      '<table class="reg-tbl"><thead><tr><th>User</th><th>Sign-in name</th><th>Access</th><th>Tabs</th><th class="r"></th></tr></thead><tbody>'+
-      (rows||'<tr><td colspan="5"><div class="reg-empty">No users yet — add them from the Users tab in the top bar.</div></td></tr>')+'</tbody></table>'+editor;
-    return this.crumb('Settings','User Permissions')+'<div class="card"><h2>User Permissions</h2>'+inner+
-      '<div class="form-actions"><button class="btn" onclick="App.settingsBack()">Back to Settings</button></div></div>'; },
-  permRole(who,role){ var b=this.curBiz(); b.permissions=b.permissions||{}; var p=b.permissions[who]=b.permissions[who]||{hidden:[]};
-    p.role=role; if(role!=='Restricted') p.hidden=[]; this.saveBiz(b); this.renderMain(b); },
-  permEdit(who){ this._permEdit=who||null; this.renderMain(this.curBiz()); },
-  permTab(who,section,on){ var b=this.curBiz(); b.permissions=b.permissions||{}; var p=b.permissions[who]=b.permissions[who]||{role:'Restricted',hidden:[]};
-    p.hidden=p.hidden||[]; var i=p.hidden.indexOf(section);
-    if(on && i>=0) p.hidden.splice(i,1); if(!on && i<0) p.hidden.push(section);
-    this.saveBiz(b); this.renderMain(b); },
+  /* ---- user permissions: set_permissions / permEdit / permEd / permSave live in js/users.js ---- */
 
   /* ---- attachments ---- */
   set_attachments(b){ var self=this; var files=b.attachments||[];
@@ -4715,32 +4643,7 @@ const App = {
     this.saveBiz(b); this.wsMode=this._periodReturn||'summary'; this.renderMain(b); },
   cancelEdit(){ this.wsMode=this._periodReturn||'summary'; this.renderMain(this.curBiz()); },
 
-  /* ---------- users ---------- */
-  showNewUser(){ this.go('newUser'); ['nuName','nuUser','nuPass'].forEach(i=>document.getElementById(i).value=''); document.getElementById('nuName').focus(); },
-  createUser(){
-    const name=document.getElementById('nuName').value.trim(), user=document.getElementById('nuUser').value.trim(),
-      pass=document.getElementById('nuPass').value, role=document.getElementById('nuRole').value;
-    if(!name||!user||!pass){ alert('Name, username and password are all required.'); return; }
-    const accts=DB.get(DB.k.accounts,[]); if(accts.some(a=>a.user.toLowerCase()===user.toLowerCase())){ alert('That username already exists.'); return; }
-    accts.push({name,user,pass}); DB.set(DB.k.accounts,accts);
-    const users=DB.get(DB.k.users,[]); users.push({id:Date.now(),name,user,role}); DB.set(DB.k.users,users); this.go('users');
-  },
-  removeUser(id){ const users=DB.get(DB.k.users,[]); if(users.length<=1){ alert('At least one user must remain.'); return; }
-    const u=users.find(x=>x.id===id); if(!confirm('Remove user “'+u.name+'”?')) return;
-    DB.set(DB.k.users, users.filter(x=>x.id!==id)); DB.set(DB.k.accounts, DB.get(DB.k.accounts,[]).filter(a=>a.user!==u.user)); this.renderUsers(); },
-  renderUsers(){
-    const q=(document.getElementById('userSearch').value||'').toLowerCase();
-    let list=DB.get(DB.k.users,[]); const total=list.length;
-    if(q) list=list.filter(u=>u.name.toLowerCase().includes(q)||u.user.toLowerCase().includes(q));
-    const wrap=document.getElementById('userListWrap');
-    if(!list.length){ wrap.innerHTML='<div class="empty"><div class="big">No users found</div></div>'; document.getElementById('userCount').textContent=''; return; }
-    const me=(this.current||{}).user;
-    const rows=list.map(u=>'<tr><td><b>'+this.esc(u.name)+'</b>'+(u.user===me?' <span class="pill pill-user">you</span>':'')+'</td>'+
-      '<td>'+this.esc(u.user)+'</td><td><span class="pill '+(u.role==='Administrator'?'pill-admin':'pill-user')+'">'+this.esc(u.role)+'</span></td>'+
-      '<td style="text-align:right"><button class="btn btn-sm btn-danger" onclick="App.removeUser('+u.id+')">Remove</button></td></tr>').join('');
-    wrap.innerHTML='<table class="tbl"><thead><tr><th>Name</th><th>Username</th><th>Role</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>';
-    document.getElementById('userCount').textContent=total+' user'+(total>1?'s':'');
-  },
+  /* ---------- users: Users page, user form and Profile live in js/users.js ---------- */
 
   /* ---------- utils ---------- */
   parseNum(s){ if(s==null) return ''; s=String(s).replace(/,/g,'').replace(/\s/g,'').trim(); if(s==='') return ''; const n=parseFloat(s); return isNaN(n)?'':n; },

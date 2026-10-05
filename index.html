@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/form-editor-embedded.css">
+<link rel="stylesheet" href="css/users.css">
 </head>
 <body>
 
@@ -15,22 +16,14 @@
 <div id="auth">
   <div class="auth-card">
     <div class="brand"><div class="logo">M</div><h1>Manager</h1><p>Accounting for your businesses</p></div>
-    <div class="auth-tabs">
-      <div class="auth-tab active" data-mode="signin" onclick="App.setAuthMode('signin')">Sign in</div>
-      <div class="auth-tab" data-mode="signup" onclick="App.setAuthMode('signup')">Sign up</div>
-    </div>
-    <div id="signupName" class="hide"><label class="fld">Full name</label><input id="suName" type="text" placeholder="Jane Smith"></div>
-    <label class="fld">Username</label><input id="auUser" type="text" placeholder="Administrator">
-    <label class="fld">Password</label>
-    <input id="auPass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')App.submitAuth()">
-    <div id="authErr" class="auth-err hide"></div>
-    <button class="btn btn-primary" onclick="App.submitAuth()" id="authBtn">Sign in</button>
-    <div class="auth-foot" id="authFoot">No account yet? <a onclick="App.setAuthMode('signup')">Create one</a></div>
+    <!-- login / first-run setup / MFA, rendered by js/users.js -->
+    <div id="authBody"></div>
   </div>
 </div>
 
 <!-- APP -->
 <div id="app" class="hide">
+  <div id="impBar" class="imp-bar hide" role="status"></div>
   <!-- One bar for the whole app: global tabs plus, once a business is open, the
        workspace controls that used to sit in a second row below. -->
   <div class="toolbar">
@@ -48,6 +41,7 @@
       <button class="tb-btn" id="tabBiz" onclick="App.go('businesses')"><span class="tb-ico" data-ico="briefcase"></span>Businesses</button>
       <button class="tb-btn" id="tabUsers" onclick="App.go('users')"><span class="tb-ico" data-ico="users"></span>Users</button>
       <button class="tb-btn" id="tabSupport" onclick="App.go('support')"><span class="tb-ico" data-ico="lifebuoy"></span>Support</button>
+      <button class="tb-btn" id="tabProfile" onclick="App.go('profile')"><span class="tb-ico" data-ico="user"></span><span id="tbProfileName">Profile</span></button>
       <button class="tb-btn" onclick="App.logout()"><span class="tb-ico" data-ico="logout"></span>Logout</button>
     </div>
     <div class="tb-right">
@@ -61,7 +55,7 @@
         <button class="btn btn-sm" onclick="App.openTool('emails')">Emails</button>
         <button class="btn btn-sm" onclick="App.openTool('history')">History</button>
         <button class="btn btn-sm" onclick="App.openTool('backup')">Backup</button>
-        <div class="hd-user"><span class="hd-avatar" id="hdAvatar">A</span>
+        <div class="hd-user" role="button" tabindex="0" title="Profile" onclick="App.go('profile')" onkeydown="if(event.key==='Enter'){App.go('profile')}"><span class="hd-avatar" id="hdAvatar">A</span>
           <span class="hd-user-txt"><span class="hd-user-name" id="hdUserName">Administrator</span>
           <span class="hd-user-role" id="hdUserRole">Administrator</span></span></div>
       </div>
@@ -105,31 +99,12 @@
     </div>
   </div>
 
-  <div id="pageUsers" class="page hide">
-    <div class="page-head"><h1 class="page-title">Users</h1></div>
-    <div class="actions">
-      <button class="btn btn-primary" onclick="App.showNewUser()">New User</button>
-      <div class="search"><span class="ic" data-ico="search"></span><input id="userSearch" type="text" placeholder="Search users…" oninput="App.renderUsers()"></div>
-    </div>
-    <div id="userListWrap"></div>
-    <div class="count" id="userCount"></div>
-  </div>
+  <!-- Users, user form and Profile are rendered by js/users.js -->
+  <div id="pageUsers" class="page hide"><div id="usersBody"></div></div>
 
-  <div id="pageNewUser" class="page hide">
-    <div class="card">
-      <h2>New User</h2>
-      <p class="sub">Administrators can access every business. Restricted users get limited access.</p>
-      <label class="fld">Name</label><input id="nuName" type="text" placeholder="Full name">
-      <label class="fld">Username</label><input id="nuUser" type="text" placeholder="Login username">
-      <label class="fld">Password</label><input id="nuPass" type="password" placeholder="••••••••">
-      <label class="fld">Role</label>
-      <select id="nuRole"><option value="Administrator">Administrator</option><option value="Restricted user">Restricted user</option></select>
-      <div class="form-actions">
-        <button class="btn btn-primary" onclick="App.createUser()">Create</button>
-        <button class="btn" onclick="App.go('users')">Cancel</button>
-      </div>
-    </div>
-  </div>
+  <div id="pageNewUser" class="page hide"><div id="userFormBody"></div></div>
+
+  <div id="pageProfile" class="page hide"><div id="profileBody"></div></div>
 
   <div id="pageSupport" class="page hide">
     <div class="page-head"><h1 class="page-title">Support</h1></div>
@@ -151,6 +126,7 @@
 <script src="js/data.js"></script>
 <script src="js/accounting.js"></script>
 <script src="js/app.js"></script>
+<script src="js/users.js"></script>
 <script src="js/designer.js"></script>
 <script src="js/form-editor-bridge.js"></script>
 <template id="fedTpl"><div id="fedHost" class="embedded">

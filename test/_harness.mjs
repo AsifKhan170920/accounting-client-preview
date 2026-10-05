@@ -24,7 +24,7 @@ export function makeLocalStorage(seed = {}) {
 }
 
 /**
- * Build a fresh app context.
+ * Build a fresh app context (js/users.js included: it owns login, users and permissions).
  *
  * Note: objects and arrays returned from the sandbox carry the vm realm's
  * prototypes, so `assert.deepStrictEqual` against a host-side literal fails on
@@ -85,6 +85,9 @@ export function loadApp({ storage = {} } = {}) {
     Math,
     JSON,
     Intl,
+    /* js/users.js hashes passwords and computes TOTP codes with Web Crypto */
+    crypto: globalThis.crypto,
+    TextEncoder,
   };
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
@@ -93,7 +96,7 @@ export function loadApp({ storage = {} } = {}) {
   // The files must run as one script: they reference each other's top-level
   // bindings, and `const App = …` / `const DB = …` are lexical, so they are not
   // reachable as globals until we publish them explicitly at the end.
-  const FILES = ['js/data.js', 'js/accounting.js', 'js/app.js'];
+  const FILES = ['js/data.js', 'js/accounting.js', 'js/app.js', 'js/users.js'];
   const EXPORTS = ['App', 'DB', 'SIDEBAR', 'SIDEBAR_FOOT', 'SIDEBAR_GROUPS', 'LABEL2KEY', 'KEY2LABEL', 'REG', 'CUR'];
   const source =
     FILES.map((f) => `/* ==== ${f} ==== */\n` + readFileSync(join(ROOT, f), 'utf8')).join('\n;\n') +
