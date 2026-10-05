@@ -221,7 +221,8 @@
                price:price==null?'':price, discount:ln.discount==null?'':String(ln.discount), taxCode:code, division:ln.division||'' };
     });
     if(!t.lines.length) t.lines=[blankLine(t)];
-    t.allocations=(rec.allocations||[]).slice();
+    /* a clone must not re-apply the original's allocations; Receive payment's prefill asks to keep them */
+    t.allocations=(mode==='edit' || rec._keepAlloc) ? (rec.allocations||[]).slice() : [];
     return t;
   }
   function partyRec(b,list,name){ return ((((b&&b.records)||{})[list])||[]).filter(function(r){ return r && r.name===name; })[0] || null; }
@@ -520,7 +521,7 @@
       colDivision:function(){ return (b.divisions||[]).length?'':'<span class="tf-hint">Add divisions in Settings → Divisions.</span>'; }
     };
     return '<div class="tf-opts">'+list.map(function(o){ var k=o[0];
-      return '<label class="tf-chk"><input type="checkbox"'+(t[k]?' checked':'')+' onchange="TxnForms._opt(\''+k+'\',this.checked)">'+esc(o[1])+'</label>'+
+      return '<label class="tf-chk"><input type="checkbox" data-opt="'+k+'"'+(t[k]?' checked':'')+' onchange="TxnForms._opt(\''+k+'\',this.checked)">'+esc(o[1])+'</label>'+
         (t[k] && reveal[k] ? '<div class="tf-reveal">'+reveal[k]()+'</div>' : ''); }).join('')+'</div>';
   }
   function actionsHtml(b,t){
@@ -720,7 +721,8 @@
       var sel=k ? '[data-k="'+k+'"]' : (f ? '[data-l="'+li+'"][data-f="'+f+'"]' : '');
       draw();
       var h=host(); if(sel && h && h.querySelector){ var n=h.querySelector(sel); if(n) try{ n.focus(); }catch(e){} } },
-    _opt:function(k,on){ if(!TX) return; TX[k]=!!on; if(k==='rounding' && on && !TX.roundMode) TX.roundMode='Round to nearest'; draw(); },
+    _opt:function(k,on){ if(!TX) return; TX[k]=!!on; if(k==='rounding' && on && !TX.roundMode) TX.roundMode='Round to nearest'; draw();
+      var h=host(), n=h && h.querySelector && h.querySelector('[data-opt="'+k+'"]'); if(n) try{ n.focus(); }catch(e){} },
     _refAuto:function(on){ var b=cur(); TX.autoRef=!!on; if(on) TX.reference=nextRef(b,TX.key); draw(); var r=host()&&host().querySelector('[data-k="reference"]'); if(r && !on) focusEl(r); },
     _partyType:function(v){ TX.partyType=v; TX.party=''; draw(); },
     _cbOpen:function(id,btn){ cbOpen(id,btn,''); },
@@ -791,7 +793,7 @@
       return { date:today(), paidByType:'customer', paidBy:inv.customer||'', customer:inv.customer||'',
         description:'Payment for sales invoice '+(inv.reference||''),
         lines:[{ account:ar?ar.id:'', accountName:'Accounts receivable', sub:inv.customer||'', amount:due, price:due }],
-        allocations: due>0 && uid ? [{ key:'salesInv', uid:uid, party:inv.customer||'', amount:due }] : [] };
+        _keepAlloc:true, allocations: due>0 && uid ? [{ key:'salesInv', uid:uid, party:inv.customer||'', amount:due }] : [] };
     },
     /** Per-business switch between this engine and the Form Designer path. */
     setEngine:function(key,engine){ var A=app(), b=A.curBiz(); if(!b) return; b.formEngine=b.formEngine||{};

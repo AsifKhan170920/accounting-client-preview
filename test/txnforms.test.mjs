@@ -262,6 +262,17 @@ describe('editing', () => {
     assert.equal(TF.totals(cur(), t).total, 105);
   });
 
+  test('a clone starts with a fresh reference and none of the original allocations', () => {
+    const inv = create('salesInv', (t) => { t.customer = 'ABC Customer'; t.lines = [line({ account: acct('Sales'), qty: '1', price: '100' })]; });
+    const pf = TF.receiptPrefill(cur(), inv);
+    const t0 = TF.start(cur(), 'receipts', pf, 'new'); t0.bank = 'ADCB'; TF.setState(t0);
+    const rec = TF.save('create', { noNav: true });
+    const cp = JSON.parse(JSON.stringify(rec)); delete cp.id; delete cp.uuid; delete cp.reference;   // what App.cloneRecord hands over
+    const t = TF.start(cur(), 'receipts', cp, 'new');
+    assert.equal(t.autoRef, true); assert.equal(t.allocations.length, 0);
+    assert.notEqual(t.reference, rec.reference);
+  });
+
   test('a legacy cash line ({account, sub, amount}) loads as an amount', () => {
     const t = TF.start(cur(), 'payments', { paidFrom: 'Cash', lines: [{ account: acct('Rent'), sub: '', desc: 'June', amount: 450 }] }, 'edit');
     assert.equal(t.lines[0].price, '450'); assert.equal(t.lines[0].desc, 'June');
