@@ -70,6 +70,11 @@
     download: '<path d="M12 3v12M7.5 11 12 15.5 16.5 11"/><path d="M4 20h16"/>',
     check: '<path d="m5 12.5 5 5L19 7"/>',
     alert: '<path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/>',
+    /* settings */
+    key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.3-9.3M16 7l3 3M14 9l2 2"/>',
+    keyboard: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
+    cloud: '<path d="M17.5 19H7a5 5 0 1 1 1.1-9.9A6 6 0 0 1 19.6 11 4 4 0 0 1 17.5 19Z"/>',
+    lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   };
 
   /* Sidebar label → icon. Anything unmapped falls back to a neutral glyph, so
@@ -96,12 +101,15 @@
 
   /* Settings tile key → icon, same contract as SECTION. */
   var SETTING = {
-    business:'building', coa:'book', control:'reconcile', themes:'puzzle', format:'percent',
-    currencies:'coins', email:'quote', tax:'percent', lock:'reconcile', divisions:'shuffle',
-    projects:'briefcase', formDefaults:'order', recurring:'transfer', starting:'scale',
-    customFields:'puzzle', customReports:'chart', locations:'box', kits:'bag',
-    claimPayers:'users', lateFees:'clock', bankRules:'bank', permissions:'user',
-    attachments:'download', obsolete:'alert', extensions:'settings',
+    business:'building', capitalSub:'landmark', coa:'book', control:'reconcile',
+    extensions:'arrowUpRight', customFields:'puzzle', themes:'card', format:'clock', email:'quote',
+    footers:'invoice', locations:'box', obsolete:'alert', payslipItems:'wallet', tax:'percent',
+    permissions:'user', accessTokens:'key', attachments:'download', bankRules:'bank',
+    billableExpenses:'receipt', cashFlowGroups:'trendUp', currencies:'coins', customReports:'chart',
+    customerPortals:'users', divisions:'shuffle', claimPayers:'wallet2', forecasts:'chart',
+    formDefaults:'order', kits:'bag', unitCosts:'tag', marketPrices:'trendUp',
+    keyboardNav:'keyboard', lateFees:'clock', lock:'lock', nonInvItems:'tag', projects:'briefcase',
+    recurring:'transfer', starting:'scale', webServices:'cloud', withholdingTax:'percent',
   };
 
   var ICO = {

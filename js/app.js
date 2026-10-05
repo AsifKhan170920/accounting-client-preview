@@ -2822,47 +2822,67 @@ const App = {
       '<div class="form-actions" style="margin-top:14px"><button class="btn" onclick="App.openTool(\'emails\')">Cancel</button><button class="btn btn-primary" onclick="App.saveEmails()">Save settings</button></div></div>'; },
   saveEmails(){ const b=this.curBiz(); if(!b) return; function g(id){ var el=document.getElementById(id); return el?el.value.trim():''; }
     b.details=Object.assign({},b.details,{email:{fromName:g('em_from'),fromAddr:g('em_addr'),replyTo:g('em_reply'),body:g('em_body')}}); this.saveBiz(b); alert('Email settings saved.'); this.openTool('emails'); },
-  settingsBack(){ this.setView=null; this.fmtCat=null; this.fmtForm=null; this.fmtDraft=null; this.fmtSel=null; this.ctrlEditId=null; this.renderMain(this.curBiz()); },
-  openSetting(key){ this.setView=key; this.fmtCat=null; this.fmtForm=null; this.fmtDraft=null; this.fmtSel=null; this.ctrlEditId=null; this._emTplType=null; this.curyCat=null; this.emailCat=null; this.renderMain(this.curBiz()); },
+  settingsBack(){ this.setView=null; this.spRoute=null; this.fmtCat=null; this.fmtForm=null; this.fmtDraft=null; this.fmtSel=null; this.ctrlEditId=null; this.renderMain(this.curBiz()); },
+  openSetting(key){ this.setView=key; this.spRoute=null; this.fmtCat=null; this.fmtForm=null; this.fmtDraft=null; this.fmtSel=null; this.ctrlEditId=null; this._emTplType=null; this.curyCat=null; this.emailCat=null; this.renderMain(this.curBiz()); },
   _setTabs(items,active,fn){ var self=this; return '<div class="set-tabs">'+items.map(function(it){ return '<button class="set-tab'+(it[0]===active?' on':'')+'" onclick="App.'+fn+'(\''+it[0]+'\')">'+self.esc(it[1])+'</button>'; }).join('')+'</div>'; },
+  /* Settings pages: [icon, name, key, description, block, ready].
+     Block 1 and block 2 are the two groups of the Settings index, split by a
+     divider (Manager.io order). Every key has an App.set_<key> handler — most
+     are drawn by js/settings-pages.js, the rest live in this file. */
   setTiles(){ return [
-    ['🏢','Business Details','business','Name, address, logo, currency & tax number',1,1],
-    ['📚','Chart of Accounts','coa','Account groups and accounts',1,1],
-    ['🎯','Control Accounts','control','Built-in & custom control accounts',1,1],
-    ['🎨','Custom Theme','themes','Form & voucher layouts',1,1],
-    ['🔢','Date & Number Format','format','How dates and amounts are displayed',1,1],
-    ['💱','Currencies','currencies','Base currency, foreign currencies & exchange rates',1,1],
-    ['✉️','Email Settings','email','SMTP server & email templates',1,1],
-    ['🏷️','Tax Codes','tax','VAT / sales-tax codes for invoices',1,1],
-    ['🔒','Lock Date','lock','Prevent edits on or before a date',1,1],
-    ['🗂️','Divisions','divisions','Track results by division / department',1,1],
-    ['📌','Projects','projects','Group transactions by job or engagement',1,1],
-    ['📋','Form Defaults','formDefaults','What a new document is pre-filled with',1,1],
-    ['🔁','Recurring Transactions','recurring','Schedules that copy a document forward',1,1],
-    ['⚖️','Starting Balances','starting','Where the books stood on day one',1,1],
-    ['🧩','Custom Fields','customFields','Every custom field you have defined',1,1],
-    ['📐','Custom Reports','customReports','Build a statement from your own account groupings',1,1],
-    ['📍','Inventory Locations','locations','Hold stock in more than one place',1,1],
-    ['🧰','Inventory Kits','kits','Sell a bundle, draw down its components',1,1],
-    ['🧳','Expense Claim Payers','claimPayers','Who pays expenses out of pocket',1,1],
-    ['⏰','Late Payment Fees','lateFees','Charges added once an invoice is overdue',1,1],
-    ['🏦','Bank Rules','bankRules','Auto-code imported statement lines',1,1],
-    ['🔐','User Permissions','permissions','Who can open this business, and what they see',1,1],
-    ['📎','Attachments','attachments','Files kept with this business',1,1],
-    ['🧯','Obsolete Features','obsolete','Older behaviour, off unless you need it',1,1],
-    ['🔌','Extensions','extensions','Pages you host that read this business',1,1]
+    ['building','Business Details','business','Name, address, logo & tax number',1,1],
+    ['landmark','Capital subaccounts','capitalSub','Drawings, contributions and other capital subaccounts',1,1],
+    ['book','Chart of Accounts','coa','Account groups and accounts',1,1],
+    ['reconcile','Control Accounts','control','Built-in & custom control accounts',1,1],
+    ['arrowUpRight','Custom Buttons','extensions','Buttons that open pages you host',1,1],
+    ['puzzle','Custom Fields','customFields','Text, date, number and other custom fields',1,1],
+    ['card','Custom Themes','themes','Form, voucher & statement layouts',1,1],
+    ['clock','Date & Number Format','format','How dates and amounts are displayed',1,1],
+    ['quote','Email Settings','email','SMTP server & email templates',1,1],
+    ['invoice','Footers','footers','Text printed at the foot of documents',1,1],
+    ['box','Inventory Locations','locations','Hold stock in more than one place',1,1],
+    ['alert','Obsolete Features','obsolete','Older behaviour, off unless you need it',1,1],
+    ['wallet','Payslip Items','payslipItems','Earnings, deductions & contributions',1,1],
+    ['percent','Tax Codes','tax','VAT / sales-tax codes for invoices',1,1],
+    ['user','User Permissions','permissions','Who can open this business, and what they see',1,1],
+    ['key','Access Tokens','accessTokens','Tokens for programs that read this business',2,1],
+    ['download','Attachments','attachments','Files kept with this business',2,1],
+    ['bank','Bank Rules','bankRules','Auto-code imported statement lines',2,1],
+    ['receipt','Billable Expenses','billableExpenses','Recharge expenses to customers',2,1],
+    ['trendUp','Cash Flow Statement Groups','cashFlowGroups','Operating, investing & financing groups',2,1],
+    ['coins','Currencies','currencies','Base currency, foreign currencies & exchange rates',2,1],
+    ['chart','Custom Reports','customReports','Build a statement from your own account groupings',2,1],
+    ['users','Customer Portals','customerPortals','What each customer can see online',2,1],
+    ['shuffle','Divisions','divisions','Track results by division / department',2,1],
+    ['wallet2','Expense Claim Payers','claimPayers','Who pays expenses out of pocket',2,1],
+    ['chart','Forecasts','forecasts','Expected income & expenses by account',2,1],
+    ['order','Form Defaults','formDefaults','What a new document is pre-filled with',2,1],
+    ['bag','Inventory Kits','kits','Sell a bundle, draw down its components',2,1],
+    ['tag','Inventory Unit Costs','unitCosts','Fixed unit costs for inventory items',2,1],
+    ['trendUp','Investment Market Prices','marketPrices','Market prices for investments',2,1],
+    ['keyboard','Keyboard Navigation','keyboardNav','Enter and arrow keys on entry forms',2,1],
+    ['clock','Late Payment Fees','lateFees','Charges added once an invoice is overdue',2,1],
+    ['lock','Lock Date','lock','Prevent edits on or before a date',2,1],
+    ['tag','Non-inventory Items','nonInvItems','Services and items not kept in stock',2,1],
+    ['briefcase','Projects','projects','Group transactions by job or engagement',2,1],
+    ['transfer','Recurring Transactions','recurring','Schedules that copy a document forward',2,1],
+    ['scale','Starting Balances','starting','Where the books stood on day one',2,1],
+    ['cloud','Web Services','webServices','Automatic exchange rates',2,1],
+    ['percent','Withholding tax','withholdingTax','Withholding tax receivable & payable',2,1]
   ]; },
+  /* The index: two columns of icon links in two blocks. Pages the signed-in
+     user may not open are left out when the permissions layer provides
+     App.canSetting. */
   settingsHtml(b){
     if(this.setView){ const fn='set_'+this.setView; if(typeof this[fn]==='function') return this[fn](b);
       return this.setMissing((this.setTiles().find(t=>t[2]===this.setView)||[])[1]||'Setting'); }
-    const ti=t=>'<span class="ico">'+((typeof window!=='undefined'&&window.ICO)?ICO.forSetting(t[2],19):t[0])+'</span>';
-    const tileHtml=t=>{ if(t[4]===2){ return '<div class="set-tile set-tile-off">'+ti(t)+'<span><span class="nm">'+this.esc(t[1])+'</span><span class="ds">'+this.esc(t[3])+'</span></span></div>'; }
-      const soon=t[5]?'':'<span class="soon">soon</span>';
-      return '<button class="set-tile" onclick="App.openSetting(\''+t[2]+'\')">'+ti(t)+'<span><span class="nm">'+this.esc(t[1])+soon+'</span><span class="ds">'+this.esc(t[3])+'</span></span></button>'; };
-    const tiles=this.setTiles(); const g1=tiles.filter(t=>t[4]===1).map(tileHtml).join(''); const g2=tiles.filter(t=>t[4]===2).map(tileHtml).join('');
-    return this.crumb('Settings')+
-      '<div class="set-grid">'+g1+'</div>'+
-      (g2?('<div class="set-secn-label">Not available in this build</div><div class="set-grid set-grid-off">'+g2+'</div>'):'');
+    const can=t=>typeof this.canSetting!=='function'||this.canSetting(b,t[2]);
+    const ico=t=>(typeof window!=='undefined'&&window.ICO)?ICO.forSetting(t[2],22):'';
+    const link=t=>'<button class="sp-link" title="'+this.esc(t[3])+'" onclick="App.openSetting(\''+t[2]+'\')"><span class="sp-link-ico">'+ico(t)+'</span><span class="sp-link-nm">'+this.esc(t[1])+'</span></button>';
+    const tiles=this.setTiles().filter(can);
+    const g1=tiles.filter(t=>t[4]===1).map(link).join(''), g2=tiles.filter(t=>t[4]===2).map(link).join('');
+    return this.crumb('Settings')+'<div class="sp-index">'+
+      (g1?'<div class="sp-grid">'+g1+'</div>':'')+(g1&&g2?'<div class="sp-divider"></div>':'')+(g2?'<div class="sp-grid">'+g2+'</div>':'')+'</div>';
   },
   setCard(sub,inner,saveFn){ return this.crumb('Settings',sub)+
     '<div class="card"><h2>'+this.esc(sub)+'</h2>'+inner+
@@ -3616,7 +3636,7 @@ const App = {
   saveStartingBalances(){ const b=this.curBiz(); if(!b) return; (b.coa||[]).filter(x=>x.type==='account').forEach(a=>{ const el=document.getElementById('sb_'+a.id); if(el) a.balance=this.parseNum(el.value)||0; }); this.saveBiz(b); refreshSummary(b); this.settingsBack(); },
 
   /* ---------- Custom Themes (form / voucher / statement formatting) ---------- */
-  crumbThemes(sub){ return '<div class="ws-crumb"><div class="left">'+App._crumbIco('settings')+' ▸ <a class="led-link" onclick="App.settingsBack()">Settings</a> ▸ <a class="led-link" onclick="App.openThemesHub()">Custom Theme</a>'+(sub?' ▸ '+this.esc(sub):'')+'</div></div>'; },
+  crumbThemes(sub){ return '<div class="ws-crumb"><div class="left">'+App._crumbIco('settings')+' ▸ <a class="led-link" onclick="App.settingsBack()">Settings</a> ▸ <a class="led-link" onclick="App.openThemesHub()">Custom Themes</a>'+(sub?' ▸ '+this.esc(sub):'')+'</div></div>'; },
   openThemesHub(){ this.fmtCat=null; this.fmtForm=null; this.fmtDraft=null; this.fmtSel=null; this.fmtColMenu=false; this._drag=null; this.renderMain(this.curBiz()); },
   openFmtCat(cat){ this.fmtCat=cat; this.fmtForm=null; this.fmtDraft=null; this.fmtSel=null; this.fmtColMenu=false; this._drag=null; this.renderMain(this.curBiz()); },
   openFmtForm(key){ this._fedReturn=this._snapNav(); this.fmtForm=key; this.fmtCat=this.fmtCat||this.fmtCatOf(key); this.fmtSel=null; this.fmtColMenu=false; this._drag=null; this._vbSel=null; this.renderMain(this.curBiz()); var self=this; setTimeout(function(){ self._mountInlineDesigner(key); },0); },
@@ -4660,6 +4680,11 @@ const App = {
       case 'D MMM YYYY': return (+D)+' '+mon[(+M)-1]+' '+Y; default: return M+'/'+D+'/'+Y; } },
   esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); },
 };
+
+/* Settings tiles whose screen is drawn by js/settings-pages.js. That file
+   replaces these handlers when it loads; until then they show the no-editor card. */
+App.setTiles().forEach(function(t){ var fn='set_'+t[2];
+  if(typeof App[fn]!=='function') App[fn]=function(b){ return (typeof SettingsPages!=='undefined')?SettingsPages.page(b,t[2]):this.setMissing(t[1]); }; });
 
 /* ===================== number → words ===================== */
 function toWordsInt(n){

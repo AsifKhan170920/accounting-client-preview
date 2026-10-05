@@ -3,9 +3,17 @@
    is the failure mode worth guarding against. */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { loadApp } from './_harness.mjs';
 
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ctx = loadApp();
+/* Most Settings screens are drawn by js/settings-pages.js, a plain <script>
+   that joins the same context as app.js in the browser. */
+vm.runInContext(readFileSync(join(ROOT, 'js/settings-pages.js'), 'utf8'), ctx, { filename: 'settings-pages.js' });
 const { App, DB, SIDEBAR, ensureCoa, ensureSettings, ensureAllControls, refreshSummary,
         findAcct, accountMovements, customerBalance, arMovement,
         lateFeeFor, lateFeesTotal, kitComponents, kitCostOf, invItemStats } = ctx;
@@ -50,12 +58,24 @@ describe('settings tiles', () => {
     const b = makeBiz();
     App.openBiz = b.id; App.curBiz = () => b;
     for (const t of App.setTiles()) {
-      App.setView = t[2];
+      App.setView = t[2]; App.spRoute = null;
       const html = App['set_' + t[2]](b);
       assert.equal(typeof html, 'string');
       assert.ok(html.length > 50, `${t[1]} rendered almost nothing`);
+      assert.ok(html.indexOf('has no editor registered') < 0, `${t[1]} fell through to the no-editor card`);
     }
     App.setView = null;
+  });
+
+  test('the index shows both blocks, split by a divider', () => {
+    const b = makeBiz();
+    App.setView = null;
+    const html = App.settingsHtml(b);
+    assert.equal((html.match(/class="sp-grid"/g) || []).length, 2);
+    assert.ok(html.indexOf('sp-divider') > 0);
+    for (const t of App.setTiles()) assert.ok(html.indexOf(">" + App.esc(t[1]) + "<") > 0, `${t[1]} missing from the index`);
+    assert.ok(html.indexOf('Business Details') < html.indexOf('sp-divider'), 'block 1 comes first');
+    assert.ok(html.indexOf('Access Tokens') > html.indexOf('sp-divider'), 'block 2 comes after the divider');
   });
 });
 
